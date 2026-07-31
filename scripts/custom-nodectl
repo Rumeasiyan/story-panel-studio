@@ -1,0 +1,301 @@
+#!/usr/bin/env python3
+"""custom-nodectl — pinned custom-node management for ai-video-gen.
+
+Nodes are declared in config/custom-nodes.yaml and installed as Git submodules under
+the project-root custom_nodes/, which ComfyUI reads via config/extra_model_paths.yaml.
+
+    ./scripts/custom-nodectl list
+    ./scripts/custom-nodectl install <id> [--yes]
+    ./scripts/custom-nodectl verify
+    ./scripts/custom-nodectl update <id> --commit <sha>
+
+Core setup deliberately works with zero third-party nodes. Add them one at a time.
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import re
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+CONFIG = ROOT / "config" / "custom-nodes.yaml"
+NODES_DIR = ROOT / "custom_nodes"
+LOCK = ROOT / "requirements.lock.txt"
+
+# Packages a custom node must never silently replace.
+PROTECTED = re.compile(r"^(torch|torchvision|torchaudio|triton|nvidia-|cuda-)", re.I)
+
+
+def _reexec_in_venv() -> None:
+    if os.environ.get("NODECTL_REEXEC") == "1":
+        return
+    py = ROOT / ".venv" / "bin" / "python"
+    if py.exists() and Path(sys.executable).resolve() != py.resolve():
+        os.environ["NODECTL_REEXEC"] = "1"
+        os.execv(str(py), [str(py), str(Path(__file__).resolve()), *sys.argv[1:]])
+
+
+_reexec_in_venv()
+
+try:
+    import yaml
+except ImportError:
+    sys.exit("PyYAML is not installed. Run: ./bootstrap.sh --core-only")
+
+
+def colour(code: str, text: str) -> str:
+    return f"\033[{code}m{text}\033[0m" if sys.stdout.isatty() else text
+
+
+def green(t): return colour("0;32", t)
+def red(t): return colour("0;31", t)
+def yellow(t): return colour("0;33", t)
+def bold(t): return colour("1", t)
+
+
+def load_nodes() -> dict:
+    if not CONFIG.exists():
+        sys.exit(f"missing {CONFIG.relative_to(ROOT)}")
+    data = yaml.safe_load(CONFIG.read_text()) or {}
+    return data.get("nodes") or {}
+
+
+def run(cmd: list[str], **kw) -> subprocess.CompletedProcess:
+    print(f"    $ {' '.join(cmd)}")
+    return subprocess.run(cmd, cwd=kw.pop("cwd", ROOT), **kw)
+
+
+def installed_commit(path: Path) -> str | None:
+    if not (path / ".git").exists():
+        return None
+    out = subprocess.run(
+        ["git", "-C", str(path), "rev-parse", "HEAD"],
+        capture_output=True, text=True,
+    )
+    return out.stdout.strip() if out.returncode == 0 else None
+
+
+def confirm(question: str) -> bool:
+    if not sys.stdin.isatty():
+        print(f"{question} [non-interactive: refusing; re-run with --yes]")
+        return False
+    try:
+        return input(f"{question} [y/N] ").strip().lower() in ("y", "yes")
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return False
+
+
+def cmd_list(args) -> int:
+    nodes = load_nodes()
+    if not nodes:
+        print("No custom nodes declared in config/custom-nodes.yaml.")
+        print("This is the intended default: the core setup needs no third-party nodes.")
+        return 0
+    for node_id, meta in nodes.items():
+        path = NODES_DIR / node_id
+        have = installed_commit(path)
+        if have is None:
+            state = yellow("not installed")
+        elif have == meta.get("commit"):
+            state = green("installed (pinned)")
+        else:
+            state = red(f"drifted (at {have[:12]})")
+        print(f"  {bold(node_id)}")
+        print(f"    repository  : {meta.get('repository', '-')}")
+        print(f"    commit      : {meta.get('commit', '-')}")
+        print(f"    licence     : {meta.get('licence', '-')}")
+        print(f"    state       : {state}")
+        if meta.get("notes"):
+            print(f"    notes       : {meta['notes'].strip()}")
+        print()
+    return 0
+
+
+def cmd_verify(args) -> int:
+    nodes = load_nodes()
+    failures = 0
+
+    for node_id, meta in nodes.items():
+        path = NODES_DIR / node_id
+        have = installed_commit(path)
+        if have is None:
+            print(f"  {yellow('MISSING'):<10} {node_id}")
+            failures += 1
+        elif have != meta.get("commit"):
+            print(f"  {red('DRIFTED'):<10} {node_id}: at {have}, pinned {meta.get('commit')}")
+            failures += 1
+        else:
+            print(f"  {green('OK'):<10} {node_id} @ {have[:12]}")
+
+    # Anything on disk that is not declared is unmanaged and unpinned.
+    if NODES_DIR.exists():
+        declared = set(nodes)
+        for entry in sorted(NODES_DIR.iterdir()):
+            if entry.is_dir() and entry.name not in declared and not entry.name.startswith("."):
+                print(f"  {red('UNDECLARED')} {entry.name} (on disk but not in config/custom-nodes.yaml)")
+                failures += 1
+
+    if not nodes and not failures:
+        print(f"  {green('OK')} no custom nodes declared or installed")
+    return 1 if failures else 0
+
+
+def _install_requirements(path: Path, node_id: str, assume_yes: bool) -> None:
+    req = path / "requirements.txt"
+    if not req.exists():
+        print("    no requirements.txt in this node")
+        return
+
+    body = req.read_text()
+    print("\n    requirements.txt:")
+    for line in body.splitlines():
+        print(f"      {line}")
+
+    risky = [
+        line.strip() for line in body.splitlines()
+        if line.strip() and not line.strip().startswith("#") and PROTECTED.match(line.strip())
+    ]
+    if risky:
+        print(f"\n    {red('WARNING')}: this node wants to install/replace core packages:")
+        for line in risky:
+            print(f"      {line}")
+        print("    Installing these can break the working CUDA PyTorch build.")
+        if not assume_yes and not confirm("    Install its requirements anyway?"):
+            print("    skipped requirements installation")
+            return
+
+    if LOCK.exists():
+        backup = LOCK.with_suffix(LOCK.suffix + ".bak")
+        shutil.copy2(LOCK, backup)
+        print(f"    backed up requirements.lock.txt -> {backup.name}")
+
+    run([sys.executable, "-m", "pip", "install", "-r", str(req)])
+    run([sys.executable, "-m", "pip", "check"])
+
+
+def cmd_install(args) -> int:
+    nodes = load_nodes()
+    if args.node_id not in nodes:
+        sys.exit(
+            f"'{args.node_id}' is not declared in config/custom-nodes.yaml.\n"
+            "Add a pinned entry there first (repository + full commit SHA + licence)."
+        )
+    meta = nodes[args.node_id]
+    commit = meta.get("commit", "")
+    if not re.fullmatch(r"[0-9a-f]{40}", commit or ""):
+        sys.exit(f"'{args.node_id}' must pin a full 40-character commit SHA, not '{commit}'")
+
+    path = NODES_DIR / args.node_id
+    print(bold(f"install plan: {args.node_id}"))
+    print(f"  repository : {meta['repository']}")
+    print(f"  commit     : {commit}")
+    print(f"  licence    : {meta.get('licence', 'UNKNOWN')}")
+    print(f"  destination: {path.relative_to(ROOT)}")
+    if meta.get("notes"):
+        print(f"  notes      : {meta['notes'].strip()}")
+    print("\n  Before continuing, confirm you have reviewed the node's maintenance")
+    print("  status, licence, and dependency changes.")
+
+    if not args.yes and not confirm("\nProceed?"):
+        print("aborted")
+        return 1
+
+    NODES_DIR.mkdir(parents=True, exist_ok=True)
+    if installed_commit(path) is None:
+        rc = run(["git", "submodule", "add", meta["repository"],
+                  f"custom_nodes/{args.node_id}"]).returncode
+        if rc != 0:
+            return rc
+    rc = run(["git", "-C", str(path), "fetch", "--quiet", "origin", commit]).returncode
+    if rc != 0:
+        run(["git", "-C", str(path), "fetch", "--quiet", "origin"])
+    rc = run(["git", "-C", str(path), "checkout", "--quiet", commit]).returncode
+    if rc != 0:
+        return rc
+    print(f"  {green('checked out')} {commit[:12]}")
+
+    _install_requirements(path, args.node_id, args.yes)
+
+    print(f"\n{green('done')}. Review and commit the submodule pointer:")
+    print(f"    git add .gitmodules custom_nodes/{args.node_id}")
+    print(f"    git commit -m 'feat: add custom node {args.node_id} pinned to {commit[:12]}'")
+    print("\nThen restart ComfyUI and run ./scripts/doctor.sh.")
+    return 0
+
+
+def cmd_update(args) -> int:
+    nodes = load_nodes()
+    if args.node_id not in nodes:
+        sys.exit(f"'{args.node_id}' is not declared in config/custom-nodes.yaml")
+    path = NODES_DIR / args.node_id
+    if installed_commit(path) is None:
+        sys.exit(f"'{args.node_id}' is not installed; run: custom-nodectl install {args.node_id}")
+
+    if not re.fullmatch(r"[0-9a-f]{40}", args.commit):
+        sys.exit("--commit must be a full 40-character SHA")
+
+    current = installed_commit(path)
+    print(f"  current : {current}")
+    print(f"  target  : {args.commit}")
+    run(["git", "-C", str(path), "fetch", "--quiet", "origin"])
+    log = subprocess.run(
+        ["git", "-C", str(path), "log", "--oneline", f"{current}..{args.commit}"],
+        capture_output=True, text=True,
+    ).stdout
+    if log:
+        print("\n  incoming commits:")
+        for line in log.splitlines()[:30]:
+            print(f"    {line}")
+
+    if not args.yes and not confirm("\nCheck out the target commit?"):
+        print("aborted")
+        return 1
+
+    rc = run(["git", "-C", str(path), "checkout", "--quiet", args.commit]).returncode
+    if rc != 0:
+        return rc
+
+    _install_requirements(path, args.node_id, args.yes)
+
+    print(f"\n{yellow('Remember')}: update the pinned commit in config/custom-nodes.yaml to")
+    print(f"  {args.commit}")
+    print("then commit both the config change and the submodule pointer.")
+    return 0
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        prog="custom-nodectl", description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    sub.add_parser("list", help="list declared nodes and their state").set_defaults(func=cmd_list)
+    sub.add_parser("verify", help="check installed commits against the pins").set_defaults(func=cmd_verify)
+
+    p = sub.add_parser("install", help="install a declared node at its pinned commit")
+    p.add_argument("node_id")
+    p.add_argument("--yes", action="store_true", help="skip confirmation prompts")
+    p.set_defaults(func=cmd_install)
+
+    p = sub.add_parser("update", help="move a node to a new pinned commit")
+    p.add_argument("node_id")
+    p.add_argument("--commit", required=True, help="full 40-character target SHA")
+    p.add_argument("--yes", action="store_true", help="skip confirmation prompts")
+    p.set_defaults(func=cmd_update)
+
+    args = parser.parse_args()
+    return args.func(args)
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        sys.exit(130)

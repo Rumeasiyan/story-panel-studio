@@ -1,0 +1,110 @@
+# Model registry for ai-video-gen.
+#
+# Manifest-driven: new profiles are added here, not by restructuring the repository.
+# Every artifact pins an exact Hugging Face revision (commit SHA), never floating `main`.
+#
+# Metadata below was resolved from the Hugging Face API on 2026-08-01.
+#
+# Schema
+#   profiles:
+#     <profile-id>:
+#       description: str
+#       engine: comfyui
+#       workflow_family: str          # informational grouping for workflows/
+#       notes: str                    # optional, VRAM/usage guidance
+#       artifacts:
+#         - id: str                   # stable local identifier
+#           repository: str           # Hugging Face repo id
+#           revision: str             # pinned commit SHA
+#           filename: str             # path inside the repo
+#           destination: str          # project-root-relative directory
+#           local_filename: str       # optional rename on disk
+#           size_bytes: int           # expected size, used by verify
+#           sha256: str               # LFS sha256, used by `modelctl verify --hash`
+#           licence: str
+#           licence_url: str
+#           commercial_review_required: bool
+
+profiles:
+
+  anime-sdxl:
+    description: Anime/manhwa still-image generation (SDXL)
+    engine: comfyui
+    workflow_family: sdxl
+    notes: >-
+      Animagine XL 4.0 "opt" variant. Comfortable on 8 GB VRAM at 1024x1024.
+      Production priority for this workstation.
+    artifacts:
+      - id: animagine-xl-4-opt
+        repository: cagliostrolab/animagine-xl-4.0
+        revision: 2b7c1b397761bf5bd3cc42e5b39ec99314a75a96
+        filename: animagine-xl-4.0-opt.safetensors
+        destination: models/checkpoints
+        size_bytes: 6938350040
+        sha256: 6327eca98bfb6538dd7a4edce22484a1bbc57a8cff6b11d075d40da1afb847ac
+        licence: CreativeML Open RAIL++-M (openrail++)
+        licence_url: https://huggingface.co/cagliostrolab/animagine-xl-4.0
+        commercial_review_required: true
+
+  cinematic-sdxl:
+    description: Realistic/cinematic still-image generation (SDXL)
+    engine: comfyui
+    workflow_family: sdxl
+    notes: >-
+      RealVisXL V4.0 full (non-fp16) single-file checkpoint. Comfortable on 8 GB VRAM.
+    artifacts:
+      - id: realvisxl-v4
+        repository: SG161222/RealVisXL_V4.0
+        revision: 26dfe44930964cd70d0a817b6d1cc945c130e38d
+        filename: RealVisXL_V4.0.safetensors
+        destination: models/checkpoints
+        size_bytes: 6938040706
+        sha256: 912c9dc74f5855175c31a7993f863a043ac8dcc31732b324cd05d75cd7e16844
+        licence: CreativeML Open RAIL++-M (openrail++)
+        licence_url: https://huggingface.co/SG161222/RealVisXL_V4.0
+        commercial_review_required: true
+
+  wan22-ti2v-5b:
+    description: Wan 2.2 TI2V-5B text/image-to-video experiment
+    engine: comfyui
+    workflow_family: wan22-ti2v
+    notes: >-
+      EXPERIMENTAL on 8 GB VRAM. Relies on ComfyUI native weight offloading and ~32 GB
+      system RAM. Start at 512x288 / 41 frames. Do not start at 720p. Not a foundation
+      for a high-volume daily video pipeline on this hardware.
+    artifacts:
+      - id: wan22-ti2v-5b
+        repository: Comfy-Org/Wan_2.2_ComfyUI_Repackaged
+        revision: fb1388adc906ab39ffc26ee40e96b22886b56bc4
+        filename: split_files/diffusion_models/wan2.2_ti2v_5B_fp16.safetensors
+        destination: models/diffusion_models
+        size_bytes: 9999658848
+        sha256: 456f901338bd9eadbded3828b819109a9b68e8a525ca5cf8d0049a69fcfeca1e
+        licence: Apache-2.0
+        licence_url: https://huggingface.co/Wan-AI/Wan2.2-TI2V-5B
+        commercial_review_required: false
+      - id: wan22-vae
+        repository: Comfy-Org/Wan_2.2_ComfyUI_Repackaged
+        revision: fb1388adc906ab39ffc26ee40e96b22886b56bc4
+        filename: split_files/vae/wan2.2_vae.safetensors
+        destination: models/vae
+        size_bytes: 1409400960
+        sha256: e40321bd36b9709991dae2530eb4ac303dd168276980d3e9bc4b6e2b75fed156
+        licence: Apache-2.0
+        licence_url: https://huggingface.co/Wan-AI/Wan2.2-TI2V-5B
+        commercial_review_required: false
+      - id: umt5-xxl-fp8-scaled
+        repository: Comfy-Org/Wan_2.2_ComfyUI_Repackaged
+        revision: fb1388adc906ab39ffc26ee40e96b22886b56bc4
+        filename: split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors
+        destination: models/text_encoders
+        size_bytes: 6735906897
+        sha256: c3355d30191f1f066b26d93fba017ae9809dce6c627dda5f6a66eaa651204f68
+        licence: Apache-2.0
+        licence_url: https://huggingface.co/Wan-AI/Wan2.2-TI2V-5B
+        commercial_review_required: false
+
+# Future profiles (newer anime/cinematic checkpoints, Wan 2.1, quantized variants,
+# LoRA packs, private character LoRAs, API-only providers) are added by appending
+# entries here. Nothing is downloaded until `./scripts/modelctl install <profile>`
+# is run and the size report is approved.

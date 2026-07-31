@@ -1,0 +1,76 @@
+name: repository-safety
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  safety:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
+
+      - name: Check for prohibited file types
+        run: |
+          set -euo pipefail
+          bad=0
+          while IFS= read -r f; do
+            case "$f" in
+              *.safetensors|*.ckpt|*.pt|*.pth|*.bin|*.onnx|*.gguf|*.engine)
+                echo "::error file=$f::model weight file committed"; bad=1 ;;
+              *.mp4|*.mov|*.mkv|*.webm|*.avi|*.wav|*.flac|*.mp3|*.aac)
+                echo "::error file=$f::generated media committed"; bad=1 ;;
+              *.psd|*.xcf|*.blend|*.exr)
+                echo "::error file=$f::large source media committed"; bad=1 ;;
+              .env|.env.*|*.token|*.key|*.pem)
+                [ "$f" = ".env.example" ] || { echo "::error file=$f::secret-like file committed"; bad=1; } ;;
+              models/*|input/*|output/*|temp/*|cache/*|user/*|.venv/*)
+                echo "::error file=$f::file inside an ignored data directory"; bad=1 ;;
+            esac
+          done < <(git ls-files)
+          exit "$bad"
+
+      - name: Check committed file sizes
+        run: |
+          set -euo pipefail
+          bad=0
+          # GitHub hard-rejects >100 MB and warns above 50 MB.
+          while IFS= read -r f; do
+            size=$(stat -c %s -- "$f")
+            if [ "$size" -gt $((50 * 1024 * 1024)) ]; then
+              echo "::error file=$f::file is $((size / 1024 / 1024)) MB (limit 50 MB)"
+              bad=1
+            fi
+          done < <(git ls-files)
+          exit "$bad"
+
+      - name: Shell syntax check
+        run: |
+          set -euo pipefail
+          fail=0
+          while IFS= read -r f; do
+            bash -n "$f" || fail=1
+          done < <(git ls-files '*.sh' '.githooks/*')
+          exit "$fail"
+
+      - name: YAML syntax check
+        run: |
+          set -euo pipefail
+          python -c "
+          import sys, glob, yaml
+          bad = 0
+          for path in glob.glob('config/*.y*ml') + glob.glob('.github/workflows/*.y*ml'):
+              try:
+                  yaml.safe_load(open(path))
+              except Exception as exc:
+                  print(f'::error file={path}::{exc}')
+                  bad = 1
+          sys.exit(bad)
+          "

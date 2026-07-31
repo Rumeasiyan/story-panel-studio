@@ -1,0 +1,7 @@
+# Project-level utilities only. Anything ComfyUI itself controls lives in
+# engine/ComfyUI/requirements.txt and must not be duplicated or re-pinned here.
+
+huggingface_hub[cli]
+PyYAML
+requests
+rich

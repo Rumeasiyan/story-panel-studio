@@ -1,0 +1,69 @@
+# Secrets and local state
+.env
+.env.*
+!.env.example
+.active-model-profile
+*.token
+*.key
+*.pem
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Models and ML weights
+models/
+engine/ComfyUI/models/
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.bin
+*.onnx
+*.gguf
+*.engine
+
+# Inputs, outputs, caches and local UI state
+input/
+output/
+temp/
+cache/
+user/
+logs/*.log
+logs/*.txt
+
+# Generated media
+*.mp4
+*.mov
+*.mkv
+*.webm
+*.avi
+*.wav
+*.flac
+*.mp3
+*.aac
+
+# Large source media and transient images
+*.psd
+*.xcf
+*.blend
+*.exr
+
+# Editors and OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Model install state (local)
+.model-state.json
+logs/*.md
+
+# Local backups made by bootstrap/update scripts
+*.bak
+*.bak.*

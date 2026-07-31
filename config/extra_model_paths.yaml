@@ -1,0 +1,31 @@
+# External model paths for ai-video-gen.
+#
+# Weights live ONCE under the project-root models/ directory. Nothing is copied or
+# symlinked into engine/ComfyUI/models, so the submodule stays clean and other engines
+# can share the same store.
+#
+# Passed explicitly at startup by scripts/comfy.sh:
+#   --extra-model-paths-config config/extra_model_paths.yaml
+#
+# Key names follow engine/ComfyUI/extra_model_paths.yaml.example. Regenerate this file
+# with ./bootstrap.sh --repair if the project is moved to a different absolute path.
+
+ai_video_gen:
+  base_path: /home/sshroot/external/ai-video-gen
+  is_default: true
+
+  checkpoints: models/checkpoints/
+  diffusion_models: models/diffusion_models/
+  text_encoders: |
+    models/text_encoders/
+    models/clip/
+  clip_vision: models/clip_vision/
+  vae: models/vae/
+  loras: models/loras/
+  controlnet: models/controlnet/
+  embeddings: models/embeddings/
+  upscale_models: models/upscale_models/
+  style_models: models/style_models/
+  # Folder name expected by IP-Adapter custom nodes (added later, one at a time).
+  ipadapter: models/ipadapter/
+  custom_nodes: custom_nodes/

@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# ai-video-gen pre-commit hook.
+# Enabled per-repository with: git config core.hooksPath .githooks
+set -uo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+CHECK="$ROOT/scripts/repository-check.sh"
+
+if [[ ! -x "$CHECK" ]]; then
+  echo "pre-commit: scripts/repository-check.sh missing or not executable; refusing commit."
+  exit 1
+fi
+
+exec "$CHECK" --staged

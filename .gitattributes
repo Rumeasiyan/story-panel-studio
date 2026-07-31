@@ -1,0 +1,24 @@
+# Default: let Git decide, but normalize text to LF in the repository.
+* text=auto eol=lf
+
+*.sh      text eol=lf
+*.bash    text eol=lf
+*.py      text eol=lf
+*.yaml    text eol=lf
+*.yml     text eol=lf
+*.json    text eol=lf
+*.md      text eol=lf
+*.txt     text eol=lf
+*.env     text eol=lf
+.env.example text eol=lf
+Makefile  text eol=lf
+.githooks/* text eol=lf
+
+# Binary assets that may legitimately be committed (small, licensed)
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.webp binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
