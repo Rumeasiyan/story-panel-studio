@@ -65,7 +65,7 @@ The UI's delete button and `scripts/forget-generation` both clear all seven:
 | 4 | `input/<id>.png` | ComfyUI's own copy of the start image |
 | 5 | `service/data/app.db` | history row: prompt, seed, every parameter |
 | 6 | ComfyUI in-memory history | the prompt again |
-| 7 | free pages in `app.db` | deleted rows, until `VACUUM` |
+| 7 | free pages in `app.db`, and `app.db-wal` | deleted rows, until `VACUUM` **and** a WAL checkpoint |
 
 ```bash
 ./scripts/forget-generation <job-id>          # one generation

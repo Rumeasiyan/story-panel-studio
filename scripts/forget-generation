@@ -233,13 +233,18 @@ def audit(job_ids: list[str] | None) -> int:
         conn.close()
         print(f"  history rows remaining: {total}")
 
-        # Deleted rows can survive in free pages until VACUUM.
-        raw = DB_PATH.read_bytes()
-        for job_id in targets:
-            if job_id.encode() in raw:
-                print(f"  {red('FOUND')} '{job_id}' still present in app.db bytes "
-                      "(run without --audit to vacuum)")
-                hits += 1
+        # Deleted rows survive in free pages until VACUUM, and in the write-ahead
+        # log until it is checkpointed and truncated. Check both.
+        for suffix in ("", "-wal", "-shm"):
+            sidecar = DB_PATH.with_name(DB_PATH.name + suffix)
+            if not sidecar.exists():
+                continue
+            raw = sidecar.read_bytes()
+            for job_id in targets:
+                if job_id.encode() in raw:
+                    print(f"  {red('FOUND')} '{job_id}' still in {sidecar.name} bytes "
+                          "(run without --audit to purge)")
+                    hits += 1
 
     try:
         with urllib.request.urlopen(f"{COMFY_URL}/history", timeout=3) as response:

@@ -171,14 +171,23 @@ def delete_job(job_id: str) -> bool:
 
     with connect() as conn:
         conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
-    # VACUUM cannot run inside a transaction, so use a fresh connection.
-    conn = connect()
+    purge_database()
+    return True
+
+
+def purge_database() -> None:
+    """Reclaim deleted rows from both the database and its write-ahead log.
+
+    VACUUM alone is not enough: in WAL mode the deleted row's bytes stay readable in
+    app.db-wal until the log is checkpointed and truncated.
+    """
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     try:
-        conn.isolation_level = None
+        conn.isolation_level = None  # VACUUM cannot run inside a transaction
         conn.execute("VACUUM")
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     finally:
         conn.close()
-    return True
 
 
 def make_thumbnail(video: Path, job_id: str) -> str | None:
