@@ -54,13 +54,31 @@
       <label class="field">
         <span>Resolution</span>
         <select id="preset"></select>
-        <small id="presetNote" class="hint"></small>
       </label>
       <label class="field">
         <span>Frames</span>
         <select id="frames"></select>
-        <small id="framesNote" class="hint"></small>
       </label>
+    </div>
+
+    <div class="grid2" id="customSize" hidden>
+      <label class="field"><span>Width</span>
+        <input id="width" type="number" step="16" value="512"></label>
+      <label class="field"><span>Height</span>
+        <input id="height" type="number" step="16" value="288"></label>
+    </div>
+    <label class="field" id="customFrames" hidden>
+      <span>Frame count</span>
+      <input id="framesCustom" type="number" step="4" value="41">
+    </label>
+
+    <div class="cost">
+      <div class="cost-line">
+        <span id="costLabel">—</span>
+        <span id="costFactor" class="cost-factor"></span>
+      </div>
+      <div class="cost-bar"><i id="costFill"></i></div>
+      <small id="costNote" class="hint"></small>
     </div>
 
     <details class="field">

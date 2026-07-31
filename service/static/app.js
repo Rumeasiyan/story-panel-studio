@@ -51,12 +51,25 @@ async function loadOptions() {
 
   const preset = $('preset');
   preset.innerHTML = OPTIONS.presets
-    .map((p) => `<option value="${p.id}">${p.width}×${p.height}</option>`).join('');
+    .map((p) => `<option value="${p.id}">${p.width}×${p.height}</option>`).join('')
+    + '<option value="custom">Custom…</option>';
   preset.value = OPTIONS.defaults.preset;
 
   const frames = $('frames');
-  frames.innerHTML = OPTIONS.frames.map((f) => `<option value="${f}">${f}</option>`).join('');
+  frames.innerHTML = OPTIONS.frames
+    .map((f) => `<option value="${f}">${f}</option>`).join('')
+    + '<option value="custom">Custom…</option>';
   frames.value = OPTIONS.defaults.frames;
+
+  const limits = OPTIONS.limits;
+  $('width').min = limits.min_dim;
+  $('width').max = limits.max_dim;
+  $('width').step = limits.dim_step;
+  $('height').min = limits.min_dim;
+  $('height').max = limits.max_dim;
+  $('height').step = limits.dim_step;
+  $('framesCustom').min = limits.min_frames;
+  $('framesCustom').max = limits.max_frames;
 
   $('sampler').innerHTML = OPTIONS.samplers.map((s) => `<option>${s}</option>`).join('');
   $('scheduler').innerHTML = OPTIONS.schedulers.map((s) => `<option>${s}</option>`).join('');
@@ -69,18 +82,76 @@ async function loadOptions() {
   $('scheduler').value = OPTIONS.defaults.scheduler;
   $('negative').value = OPTIONS.default_negative;
 
-  preset.addEventListener('change', updateNotes);
-  frames.addEventListener('change', updateNotes);
-  $('fps').addEventListener('input', updateNotes);
+  ['preset', 'frames', 'fps', 'width', 'height', 'framesCustom']
+    .forEach((id) => {
+      $(id).addEventListener('change', updateNotes);
+      $(id).addEventListener('input', updateNotes);
+    });
   updateNotes();
 }
 
+// Current width/height/frames, whichever source the form is using.
+function chosenSize() {
+  const presetId = $('preset').value;
+  if (presetId === 'custom') {
+    return { width: Number($('width').value) || 0, height: Number($('height').value) || 0 };
+  }
+  const preset = OPTIONS.presets.find((p) => p.id === presetId);
+  return { width: preset ? preset.width : 0, height: preset ? preset.height : 0 };
+}
+
+function chosenFrames() {
+  const raw = $('frames').value === 'custom'
+    ? Number($('framesCustom').value) || 0
+    : Number($('frames').value);
+  // Wan needs length = 4n + 1; show what the server will actually use.
+  return raw - ((raw - 1) % 4);
+}
+
+const snap = (value) => {
+  const { min_dim: lo, max_dim: hi, dim_step: step } = OPTIONS.limits;
+  return Math.max(lo, Math.min(hi, Math.round(value / step) * step));
+};
+
 function updateNotes() {
-  const preset = OPTIONS.presets.find((p) => p.id === $('preset').value);
-  $('presetNote').textContent = preset ? preset.note : '';
-  const frames = Number($('frames').value);
+  const isCustomSize = $('preset').value === 'custom';
+  const isCustomFrames = $('frames').value === 'custom';
+  $('customSize').hidden = !isCustomSize;
+  $('customFrames').hidden = !isCustomFrames;
+
+  const { width, height } = chosenSize();
+  const frames = chosenFrames();
   const fps = Number($('fps').value) || 24;
-  $('framesNote').textContent = `${(frames / fps).toFixed(1)}s at ${fps} fps`;
+  const limits = OPTIONS.limits;
+
+  const cost = (width * height * frames) / limits.baseline_cost;
+  const seconds = frames / fps;
+
+  $('costLabel').textContent =
+    `${width}×${height} · ${frames} frames · ${seconds.toFixed(1)}s @ ${fps}fps`;
+  $('costFactor').textContent = `${cost.toFixed(1)}× baseline`;
+
+  // Bar fills up at 4x the safe baseline, which is roughly where 8 GB gives out.
+  const fill = Math.min(100, (cost / 4) * 100);
+  const bar = $('costFill');
+  bar.style.width = `${fill}%`;
+  bar.className = cost <= 1.2 ? 'ok' : cost <= 2.5 ? 'warn' : 'bad';
+
+  let note;
+  if (width * height > limits.max_pixels) {
+    note = `Too large: ${(width * height).toLocaleString()} pixels, limit is `
+         + `${limits.max_pixels.toLocaleString()}.`;
+  } else if (isCustomSize && (snap(width) !== width || snap(height) !== height)) {
+    note = `Will be rounded to ${snap(width)}×${snap(height)} — Wan needs `
+         + `multiples of ${limits.dim_step}.`;
+  } else if (cost <= 1.2) {
+    note = 'Comfortable on 8 GB.';
+  } else if (cost <= 2.5) {
+    note = 'Heavier than the safe baseline — expect more offloading and a longer render.';
+  } else {
+    note = 'Well beyond the 8 GB baseline. May run very slowly or run out of memory.';
+  }
+  $('costNote').textContent = note;
 }
 
 // ------------------------------------------------------------------ status
@@ -180,7 +251,11 @@ async function generate() {
   form.set('prompt', prompt);
   form.set('negative', $('negative').value);
   form.set('preset', $('preset').value);
-  form.set('frames', $('frames').value);
+  if ($('preset').value === 'custom') {
+    form.set('width', $('width').value);
+    form.set('height', $('height').value);
+  }
+  form.set('frames', String(chosenFrames()));
   form.set('steps', $('steps').value);
   form.set('cfg', $('cfg').value);
   form.set('fps', $('fps').value);
@@ -374,7 +449,12 @@ function wireModal() {
     if (!job) return;
     $('prompt').value = job.prompt;
     $('negative').value = job.negative;
-    $('frames').value = job.frames;
+    if (OPTIONS.frames.includes(job.frames)) {
+      $('frames').value = job.frames;
+    } else {
+      $('frames').value = 'custom';
+      $('framesCustom').value = job.frames;
+    }
     $('steps').value = job.steps;
     $('cfg').value = job.cfg;
     $('fps').value = job.fps;
@@ -383,7 +463,13 @@ function wireModal() {
     $('scheduler').value = job.scheduler;
     $('seed').value = job.seed;
     const preset = OPTIONS.presets.find((p) => p.width === job.width && p.height === job.height);
-    if (preset) $('preset').value = preset.id;
+    if (preset) {
+      $('preset').value = preset.id;
+    } else {
+      $('preset').value = 'custom';
+      $('width').value = job.width;
+      $('height').value = job.height;
+    }
     updateNotes();
     closeModal();
     window.scrollTo({ top: 0, behavior: 'smooth' });

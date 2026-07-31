@@ -40,6 +40,18 @@ PRESETS = {
 # Wan wants length = 4n + 1.
 FRAME_CHOICES = [25, 41, 49, 65, 81, 121]
 
+# Bounds for custom sizes. Wan's VAE needs both dimensions to be multiples of 16.
+DIM_STEP = 16
+MIN_DIM = 128
+MAX_DIM = 1280
+MAX_PIXELS = 1280 * 704      # never exceed the template's own maximum frame size
+MIN_FRAMES = 5
+MAX_FRAMES = 201
+
+# What one "cost unit" is: the safe 8 GB starting point. The UI compares any chosen
+# size against this so you can see how much more you are asking of the card.
+BASELINE_COST = 512 * 288 * 41
+
 DEFAULTS = {
     "preset": "512x288",
     "frames": 41,

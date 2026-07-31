@@ -28,11 +28,18 @@ from PIL import Image
 
 import jobs as jobstore
 from config import (
+    BASELINE_COST,
     DATA_DIR,
     DEFAULTS,
     DEFAULT_NEGATIVE,
     FRAME_CHOICES,
+    DIM_STEP,
+    MAX_DIM,
+    MAX_FRAMES,
+    MAX_PIXELS,
     MAX_UPLOAD_BYTES,
+    MIN_DIM,
+    MIN_FRAMES,
     OUTPUT_DIR,
     PRESETS,
     SERVICE_DIR,
@@ -85,6 +92,11 @@ def parse_float(value, default: float, low: float, high: float) -> float:
     return max(low, min(high, number))
 
 
+def snap(value: int) -> int:
+    """Round a dimension to the multiple of 16 that Wan's VAE requires."""
+    return max(MIN_DIM, min(MAX_DIM, round(value / DIM_STEP) * DIM_STEP))
+
+
 def normalise_image(raw: bytes, job_id: str) -> str:
     """Re-encode an upload to PNG. Never trust an uploaded file as-is."""
     try:
@@ -117,6 +129,15 @@ async def options():
         "samplers": SAMPLERS,
         "schedulers": SCHEDULERS,
         "defaults": DEFAULTS,
+        "limits": {
+            "min_dim": MIN_DIM,
+            "max_dim": MAX_DIM,
+            "dim_step": DIM_STEP,
+            "max_pixels": MAX_PIXELS,
+            "min_frames": MIN_FRAMES,
+            "max_frames": MAX_FRAMES,
+            "baseline_cost": BASELINE_COST,
+        },
         "default_negative": DEFAULT_NEGATIVE,
         "max_upload_mb": MAX_UPLOAD_BYTES // (1024 * 1024),
     }
@@ -150,6 +171,8 @@ async def generate(
     prompt: str = Form(...),
     negative: str = Form(DEFAULT_NEGATIVE),
     preset: str = Form(DEFAULTS["preset"]),
+    width: int = Form(512),
+    height: int = Form(288),
     frames: int = Form(DEFAULTS["frames"]),
     steps: int = Form(DEFAULTS["steps"]),
     cfg: float = Form(DEFAULTS["cfg"]),
@@ -164,11 +187,21 @@ async def generate(
     if not prompt:
         raise HTTPException(400, "a prompt is required")
 
-    if preset not in PRESETS:
+    if preset == "custom":
+        width = snap(parse_int(width, 512, MIN_DIM, MAX_DIM))
+        height = snap(parse_int(height, 288, MIN_DIM, MAX_DIM))
+        if width * height > MAX_PIXELS:
+            raise HTTPException(
+                400,
+                f"{width}×{height} is {width * height:,} pixels; the limit is "
+                f"{MAX_PIXELS:,} ({MAX_PIXELS // 704}×704). Reduce the size.",
+            )
+    elif preset in PRESETS:
+        width, height, _ = PRESETS[preset]
+    else:
         raise HTTPException(400, f"unknown preset '{preset}'")
-    width, height, _ = PRESETS[preset]
 
-    frames = parse_int(frames, DEFAULTS["frames"], 5, 201)
+    frames = parse_int(frames, DEFAULTS["frames"], MIN_FRAMES, MAX_FRAMES)
     # Wan needs length = 4n + 1.
     frames = frames - ((frames - 1) % 4)
 
