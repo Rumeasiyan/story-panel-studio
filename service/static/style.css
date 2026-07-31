@@ -15,6 +15,12 @@
 
 * { box-sizing: border-box; }
 
+/* An element with its own `display` rule beats the browser default
+   `[hidden] { display: none }`, which silently breaks every `hidden` toggle in the
+   page (.modal is display:grid, .grid2 is grid, .field is flex, .dropzone img is
+   block). Make the attribute win everywhere. */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   background: var(--bg);
