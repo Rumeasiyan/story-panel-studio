@@ -83,14 +83,30 @@ fi
 # shellcheck disable=SC1091
 source .venv/bin/activate
 
+BIND_HOST="${UI_HOST:-127.0.0.1}"
+
+URLS="  ${GRN}${BLD}Open http://127.0.0.1:$UI_PORT${NC}"
+EXPOSURE=""
+if [[ "$BIND_HOST" != "127.0.0.1" && "$BIND_HOST" != "localhost" && "$BIND_HOST" != "::1" ]]; then
+  while read -r addr; do
+    [[ -n "$addr" ]] && URLS+=$'\n'"         or http://$addr:$UI_PORT"
+  done < <(ip -4 addr show scope global 2>/dev/null | grep -oP 'inet \K[\d.]+')
+  EXPOSURE="
+  ${YEL}${BLD}Bound to $BIND_HOST — reachable from other machines.${NC}
+  ${YEL}There is no authentication: anyone who can reach this port can generate,
+  browse, download and delete every generation. ComfyUI itself stays on
+  127.0.0.1 and is not exposed.${NC}"
+fi
+
 cat <<EOF
 
-  ${GRN}${BLD}Open http://127.0.0.1:$UI_PORT${NC}
+$URLS
+$EXPOSURE
 
   engine : 127.0.0.1:$COMFY_PORT ($ENGINE_MODE mode)
   models : $( [[ -f models/diffusion_models/wan2.2_ti2v_5B_fp16.safetensors ]] \
               && echo "wan22-ti2v-5b present" || echo "${YEL}Wan weights missing — run ./scripts/modelctl install wan22-ti2v-5b${NC}" )
-  note   : no authentication; localhost only. Ctrl-C stops everything.
+  note   : no authentication. Ctrl-C stops everything.
 
 EOF
 
