@@ -56,7 +56,7 @@
         <select id="preset"></select>
       </label>
       <label class="field">
-        <span>Frames</span>
+        <span>Length</span>
         <select id="frames"></select>
       </label>
     </div>
@@ -67,10 +67,12 @@
       <label class="field"><span>Height</span>
         <input id="height" type="number" step="16" value="288"></label>
     </div>
-    <label class="field" id="customFrames" hidden>
-      <span>Frame count</span>
-      <input id="framesCustom" type="number" step="4" value="41">
-    </label>
+    <div class="grid2" id="customFrames" hidden>
+      <label class="field"><span>Seconds</span>
+        <input id="secondsCustom" type="number" step="0.5" min="0.2" value="1.7"></label>
+      <label class="field"><span>Frames per second</span>
+        <input id="fps2" type="number" min="1" max="60" value="24"></label>
+    </div>
 
     <div class="cost">
       <div class="cost-line">

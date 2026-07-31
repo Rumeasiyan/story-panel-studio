@@ -57,9 +57,7 @@ async function loadOptions() {
   preset.value = OPTIONS.defaults.preset;
 
   const frames = $('frames');
-  frames.innerHTML = OPTIONS.frames
-    .map((f) => `<option value="${f}">${f}</option>`).join('')
-    + '<option value="custom">Custom…</option>';
+  renderLengthOptions(OPTIONS.defaults.fps);
   frames.value = OPTIONS.defaults.frames;
 
   const limits = OPTIONS.limits;
@@ -69,8 +67,7 @@ async function loadOptions() {
   $('height').min = limits.min_dim;
   $('height').max = limits.max_dim;
   $('height').step = limits.dim_step;
-  $('framesCustom').min = limits.min_frames;
-  $('framesCustom').max = limits.max_frames;
+  $('secondsCustom').max = limits.max_frames / 24;
 
   $('sampler').innerHTML = OPTIONS.samplers.map((s) => `<option>${s}</option>`).join('');
   $('scheduler').innerHTML = OPTIONS.schedulers.map((s) => `<option>${s}</option>`).join('');
@@ -83,7 +80,11 @@ async function loadOptions() {
   $('scheduler').value = OPTIONS.defaults.scheduler;
   $('negative').value = OPTIONS.default_negative;
 
-  ['preset', 'frames', 'fps', 'width', 'height', 'framesCustom']
+  // The two fps inputs (Advanced and the Length row) mirror each other.
+  $('fps2').addEventListener('input', () => { $('fps').value = $('fps2').value; updateNotes(); });
+  $('fps').addEventListener('input', () => { $('fps2').value = $('fps').value; });
+
+  ['preset', 'frames', 'fps', 'width', 'height', 'secondsCustom', 'fps2']
     .forEach((id) => {
       $(id).addEventListener('change', updateNotes);
       $(id).addEventListener('input', updateNotes);
@@ -101,9 +102,25 @@ function chosenSize() {
   return { width: preset ? preset.width : 0, height: preset ? preset.height : 0 };
 }
 
+let lastLabelledFps = null;
+
+function renderLengthOptions(fps) {
+  // Rebuilding the <select> steals focus and closes it mid-interaction, so only do it
+  // when the labels would actually change.
+  if (fps === lastLabelledFps) return;
+  lastLabelledFps = fps;
+  const select = $('frames');
+  const keep = select.value;
+  select.innerHTML = OPTIONS.frames
+    .map((f) => `<option value="${f}">${(f / fps).toFixed(1)}s · ${f} frames</option>`)
+    .join('') + '<option value="custom">Custom…</option>';
+  if (keep) select.value = keep;
+}
+
 function chosenFrames() {
+  const fps = Number($('fps').value) || 24;
   const raw = $('frames').value === 'custom'
-    ? Number($('framesCustom').value) || 0
+    ? Math.round((Number($('secondsCustom').value) || 0) * fps)
     : Number($('frames').value);
   // Wan needs length = 4n + 1; show what the server will actually use.
   const step = OPTIONS.limits.frame_step;
@@ -121,9 +138,10 @@ function updateNotes() {
   $('customSize').hidden = !isCustomSize;
   $('customFrames').hidden = !isCustomFrames;
 
-  const { width, height } = chosenSize();
-  const frames = chosenFrames();
   const fps = Number($('fps').value) || 24;
+  renderLengthOptions(fps);
+  const { width, height } = chosenSize();
+  const frames = Math.max(OPTIONS.limits.min_frames, chosenFrames());
   const limits = OPTIONS.limits;
 
   const pixelFrames = width * height * frames;
@@ -474,8 +492,9 @@ function wireModal() {
       $('frames').value = job.frames;
     } else {
       $('frames').value = 'custom';
-      $('framesCustom').value = job.frames;
+      $('secondsCustom').value = (job.frames / job.fps).toFixed(2);
     }
+    $('fps2').value = job.fps;
     $('steps').value = job.steps;
     $('cfg').value = job.cfg;
     $('fps').value = job.fps;
