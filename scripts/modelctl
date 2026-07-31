@@ -8,7 +8,7 @@ project-root models/ store, and never touches engine/ComfyUI/models.
     ./scripts/modelctl show <profile>
     ./scripts/modelctl status
     ./scripts/modelctl set <profile>
-    ./scripts/modelctl install <profile> [--yes] [--force]
+    ./scripts/modelctl install <profile> [--yes] [--force] [--no-aria2]
     ./scripts/modelctl verify <profile> [--hash]
     ./scripts/modelctl disk
 """
@@ -34,6 +34,28 @@ SINGLE_FILE_APPROVAL_BYTES = 5 * 1000**3
 TOTAL_APPROVAL_BYTES = 10 * 1000**3
 
 GB = 1000**3
+
+
+def _load_dotenv() -> None:
+    """Load a local .env (gitignored) without overriding the real environment.
+
+    Only HF_TOKEN and HF_HOME matter here; the file is never logged or printed.
+    """
+    env_file = ROOT / ".env"
+    if not env_file.exists():
+        return
+    for line in env_file.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and value:
+            os.environ.setdefault(key, value)
+
+
+_load_dotenv()
 
 
 def _venv_python() -> Path:
@@ -199,6 +221,50 @@ def dir_bytes(path: Path) -> int:
         return sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
 
 
+ARIA2_CONNECTIONS = 8
+
+
+def artifact_url(art: dict) -> str:
+    return (
+        f"https://huggingface.co/{art['repository']}/resolve/"
+        f"{art['revision']}/{art['filename']}"
+    )
+
+
+def aria2_download(art: dict, tmp: Path) -> None:
+    """Fetch one artifact directly from the CDN with parallel ranges.
+
+    Writes to `tmp` and resumes an existing partial file. Raises SystemExit on failure,
+    leaving the partial file in place so a re-run continues where it stopped.
+    """
+    cmd = [
+        "aria2c",
+        artifact_url(art),
+        "--dir", str(tmp.parent),
+        "--out", tmp.name,
+        f"--max-connection-per-server={ARIA2_CONNECTIONS}",
+        f"--split={ARIA2_CONNECTIONS}",
+        "--min-split-size=1M",
+        "--continue=true",
+        "--auto-file-renaming=false",
+        "--allow-overwrite=true",
+        "--max-tries=5",
+        "--retry-wait=5",
+        "--console-log-level=warn",
+        "--summary-interval=10",
+    ]
+    token = os.environ.get("HF_TOKEN")
+    if token:
+        cmd.append(f"--header=Authorization: Bearer {token}")
+
+    result = subprocess.run(cmd)
+    if result.returncode != 0:
+        sys.exit(
+            f"aria2c failed for {art['id']} (exit {result.returncode}). "
+            f"The partial file was kept at {tmp}; re-run install to resume."
+        )
+
+
 WORKFLOW_REMINDER = (
     "Note: a ComfyUI workflow stores the exact model filename in its loader node.\n"
     "      Switching profiles does not rewrite existing workflows."
@@ -327,6 +393,12 @@ def cmd_disk(args) -> int:
 
 
 def cmd_install(args) -> int:
+    # The hf-xet transport stalled badly on this connection: it burned 2.26 GB of
+    # network traffic to write 320 MB to disk, then wedged with concurrency pinned to
+    # 1 and "connection struggling" in its logs. Plain HTTPS to the CDN is reliable
+    # here and resumes properly. Override by exporting HF_HUB_DISABLE_XET=0.
+    os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
+
     try:
         from huggingface_hub import hf_hub_download
     except ImportError:
@@ -338,6 +410,7 @@ def cmd_install(args) -> int:
     profiles = load_profiles()
     profile = get_profile(profiles, args.profile)
     artifacts = profile.get("artifacts", [])
+    use_aria2 = shutil.which("aria2c") is not None and not args.no_aria2
 
     plan, skip = [], []
     for art in artifacts:
@@ -369,13 +442,14 @@ def cmd_install(args) -> int:
     print(f"  total download : {human(total)}")
     print(f"  free space     : {human(free)}")
 
-    # Hugging Face downloads land in the HF cache before being copied into models/,
-    # so require headroom for both copies plus a margin.
-    needed = int(total * 2.1)
+    # aria2 writes straight into models/. huggingface_hub stages the file in its cache
+    # first, so that path needs headroom for two copies plus a margin.
+    needed = int(total * (1.05 if use_aria2 else 2.1))
     if free < needed:
+        detail = "" if use_aria2 else " (download cache + final copy)"
         sys.exit(
-            f"\nrefusing to continue: need roughly {human(needed)} free "
-            f"(download cache + final copy), only {human(free)} available."
+            f"\nrefusing to continue: need roughly {human(needed)} free"
+            f"{detail}, only {human(free)} available."
         )
 
     needs_approval = (
@@ -395,19 +469,40 @@ def cmd_install(args) -> int:
     state_data = read_state()
     installs = state_data.setdefault("installs", {})
 
+    if use_aria2:
+        print(f"\ntransport: aria2c, {ARIA2_CONNECTIONS} connections per file")
+    else:
+        print("\ntransport: huggingface_hub (single stream)")
+
     for art, path, _ in plan:
         path.parent.mkdir(parents=True, exist_ok=True)
         print(f"\ndownloading {art['id']} ...")
-        # hf_hub_download resumes interrupted transfers and uses temporary
-        # .incomplete files, so a partial download is never mistaken for a real one.
-        cached = hf_hub_download(
-            repo_id=art["repository"],
-            revision=art["revision"],
-            filename=art["filename"],
-            cache_dir=os.environ.get("HF_HOME"),
-        )
         tmp = path.with_suffix(path.suffix + ".partial")
-        shutil.copyfile(cached, tmp)
+
+        if use_aria2:
+            # Hugging Face throttles a single connection hard (measured ~0.7 MB/s here
+            # against ~45 MB/s with 8 parallel ranges), so pull directly from the CDN
+            # with aria2. Downloads straight to models/ — no second copy in the HF
+            # cache — and --continue resumes an interrupted transfer.
+            aria2_download(art, tmp)
+            linked = True
+        else:
+            cached = hf_hub_download(
+                repo_id=art["repository"],
+                revision=art["revision"],
+                filename=art["filename"],
+                cache_dir=os.environ.get("HF_HOME"),
+            )
+            tmp.unlink(missing_ok=True)
+            # Prefer a hard link to the cache blob: same filesystem means no second
+            # copy on disk, and the data stays alive while any link references it.
+            try:
+                os.link(cached, tmp)
+                linked = True
+            except OSError:
+                shutil.copyfile(cached, tmp)
+                linked = False
+
         expected = art.get("size_bytes")
         actual = tmp.stat().st_size
         if expected and actual != expected:
@@ -428,7 +523,12 @@ def cmd_install(args) -> int:
             ).stdout.strip(),
         }
         write_state(state_data)
-        print(f"  {Colour.green('installed')} {path.relative_to(ROOT)}")
+        print(f"  {Colour.green('installed')} {path.relative_to(ROOT)}"
+              f"{'' if linked else '  (copied)'}")
+
+    if use_aria2:
+        print("\nNothing was written to the Hugging Face cache; "
+              "files went straight into models/.")
 
     print(f"\ndone. Verify with: ./scripts/modelctl verify {args.profile}")
     print(WORKFLOW_REMINDER)
@@ -493,6 +593,8 @@ def main() -> int:
                    help="skip the interactive approval prompt for large downloads")
     p.add_argument("--force", action="store_true",
                    help="re-download artifacts that are already present and valid")
+    p.add_argument("--no-aria2", action="store_true",
+                   help="use huggingface_hub single-stream download instead of aria2c")
     p.set_defaults(func=cmd_install)
 
     p = sub.add_parser("verify", help="verify installed artifacts")
