@@ -1,0 +1,190 @@
+#!/usr/bin/env python3
+"""workflow-to-api — convert a UI-format ComfyUI workflow to API format.
+
+The browser's "Export (API)" produces the schema `POST /prompt` expects. This does the
+same conversion headlessly, so API templates can be regenerated from the committed UI
+workflows without opening a browser.
+
+    ./scripts/workflow-to-api workflows/video/wan22/wan2.2_ti2v_5B_official.json \
+        -o workflows/api/wan22_ti2v_5b.json
+
+Needs node schemas. Either point it at a running ComfyUI:
+
+    ./scripts/workflow-to-api IN -o OUT --server http://127.0.0.1:8188
+
+or reuse a cached dump:
+
+    ./scripts/workflow-to-api IN -o OUT --object-info config/object-info.json
+
+How it works: for each node, walk its declared inputs in order. Connected inputs become
+[source_node_id, source_slot]; the rest consume `widgets_values` positionally, which is
+exactly how the frontend serialises them. Inputs flagged `control_after_generate` (e.g.
+KSampler's seed) consume one extra value that the API format does not carry.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+import urllib.request
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+
+# Nodes that exist only in the editor and are never executed.
+UI_ONLY = {"Note", "MarkdownNote", "Reroute", "PrimitiveNode"}
+
+
+def load_object_info(server: str | None, cached: Path | None) -> dict:
+    if cached:
+        return json.loads(cached.read_text())
+    url = f"{server.rstrip('/')}/object_info"
+    try:
+        with urllib.request.urlopen(url, timeout=30) as response:
+            return json.load(response)
+    except OSError as exc:
+        sys.exit(
+            f"could not fetch {url}: {exc}\n"
+            "Start ComfyUI first (./scripts/comfy.sh wan) or pass --object-info."
+        )
+
+
+def input_order(schema: dict) -> list[tuple[str, list]]:
+    """Declared inputs in order: required first, then optional."""
+    spec = schema.get("input", {})
+    ordered = list(spec.get("required", {}).items())
+    ordered += list(spec.get("optional", {}).items())
+    return ordered
+
+
+# Scalar types the editor renders as a widget. "COMBO" is the current spelling for a
+# dropdown; older schemas write the option list inline instead, e.g. LoadImage's image.
+WIDGET_TYPES = {"STRING", "INT", "FLOAT", "BOOLEAN", "COMBO"}
+
+
+def is_widget(spec) -> bool:
+    if isinstance(spec, list):
+        return True
+    return isinstance(spec, str) and spec in WIDGET_TYPES
+
+
+def has_control_after_generate(definition: list) -> bool:
+    return (
+        len(definition) > 1
+        and isinstance(definition[1], dict)
+        and bool(definition[1].get("control_after_generate"))
+    )
+
+
+def default_for(definition: list):
+    if len(definition) > 1 and isinstance(definition[1], dict):
+        if "default" in definition[1]:
+            return definition[1]["default"]
+    spec = definition[0]
+    if isinstance(spec, list) and spec:
+        return spec[0]
+    return None
+
+
+def convert(ui: dict, object_info: dict) -> dict:
+    nodes = {int(n["id"]): n for n in ui.get("nodes", [])}
+
+    # link id -> (source_node_id, source_slot)
+    links: dict[int, tuple[int, int]] = {}
+    for link in ui.get("links", []):
+        # [link_id, origin_id, origin_slot, target_id, target_slot, type]
+        links[int(link[0])] = (int(link[1]), int(link[2]))
+
+    api: dict[str, dict] = {}
+    skipped: list[str] = []
+
+    for node_id, node in nodes.items():
+        node_type = node["type"]
+        if node_type in UI_ONLY:
+            continue
+        if node.get("mode") in (2, 4):  # muted or bypassed
+            skipped.append(f"{node_id} ({node_type}, disabled in the editor)")
+            continue
+
+        schema = object_info.get(node_type)
+        if schema is None:
+            sys.exit(
+                f"node type '{node_type}' (id {node_id}) is unknown to this ComfyUI "
+                "install. Install the custom node that provides it, or remove it."
+            )
+
+        # Which of this node's inputs are wired up in the editor?
+        connected: dict[str, tuple[int, int]] = {}
+        for slot in node.get("inputs", []) or []:
+            link_id = slot.get("link")
+            if link_id is not None and int(link_id) in links:
+                connected[slot["name"]] = links[int(link_id)]
+
+        widget_values = list(node.get("widgets_values") or [])
+        cursor = 0
+        inputs: dict = {}
+
+        for name, definition in input_order(schema):
+            if name in connected:
+                source_id, source_slot = connected[name]
+                inputs[name] = [str(source_id), source_slot]
+                continue
+
+            if not is_widget(definition[0]):
+                # This input only accepts a link from another node's output and is not
+                # connected, so it contributes nothing to the API payload.
+                continue
+
+            if cursor < len(widget_values):
+                inputs[name] = widget_values[cursor]
+                cursor += 1
+                if has_control_after_generate(definition):
+                    cursor += 1  # swallow "randomize"/"fixed"/...
+            else:
+                fallback = default_for(definition)
+                if fallback is not None:
+                    inputs[name] = fallback
+
+        entry = {"class_type": node_type, "inputs": inputs}
+        title = (node.get("title") or "").strip()
+        if title and title != node_type:
+            entry["_meta"] = {"title": title}
+        api[str(node_id)] = entry
+
+    if skipped:
+        print("skipped: " + "; ".join(skipped), file=sys.stderr)
+    return api
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("workflow", type=Path, help="UI-format workflow JSON")
+    parser.add_argument("-o", "--output", type=Path, required=True,
+                        help="where to write the API-format JSON")
+    parser.add_argument("--server", default="http://127.0.0.1:8188",
+                        help="running ComfyUI to read /object_info from")
+    parser.add_argument("--object-info", type=Path,
+                        help="cached /object_info dump to use instead of a live server")
+    parser.add_argument("--save-object-info", type=Path,
+                        help="also write the fetched /object_info here")
+    args = parser.parse_args()
+
+    ui = json.loads(args.workflow.read_text())
+    object_info = load_object_info(args.server, args.object_info)
+
+    if args.save_object_info:
+        args.save_object_info.parent.mkdir(parents=True, exist_ok=True)
+        args.save_object_info.write_text(json.dumps(object_info))
+
+    api = convert(ui, object_info)
+
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(json.dumps(api, indent=2) + "\n")
+    print(f"wrote {args.output} ({len(api)} executable nodes)")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -2,7 +2,7 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
 .PHONY: help bootstrap bootstrap-core doctor run run-lowvram run-wan \
-        models model-status repo-check snapshot update nodes
+        models model-status repo-check snapshot update nodes serve serve-ui
 
 help: ## Show this help
 	@echo "ai-video-gen — available targets"
@@ -47,3 +47,9 @@ snapshot: ## Write an environment snapshot report
 
 update: ## Deliberate ComfyUI submodule + environment update
 	./scripts/update.sh
+
+serve: ## Start the local web UI (and ComfyUI behind it)
+	./scripts/serve.sh
+
+serve-ui: ## Start only the web UI (ComfyUI must already be running)
+	./scripts/serve.sh --no-engine

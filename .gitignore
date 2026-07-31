@@ -67,3 +67,7 @@ logs/*.md
 # Local backups made by bootstrap/update scripts
 *.bak
 *.bak.*
+
+# Local web UI runtime state (database, uploads, thumbnails)
+service/data/
+cache/object-info.json
