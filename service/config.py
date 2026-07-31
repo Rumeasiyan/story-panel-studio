@@ -40,17 +40,23 @@ PRESETS = {
 # Wan wants length = 4n + 1.
 FRAME_CHOICES = [25, 41, 49, 65, 81, 121]
 
-# Bounds for custom sizes. Wan's VAE needs both dimensions to be multiples of 16.
+# Model requirements, not hardware limits: Wan's VAE needs both dimensions to be
+# multiples of 16, and its latent layout needs length = 4n + 1. These always apply.
 DIM_STEP = 16
-MIN_DIM = 128
-MAX_DIM = 1280
-MAX_PIXELS = 1280 * 704      # never exceed the template's own maximum frame size
-MIN_FRAMES = 5
-MAX_FRAMES = 201
+FRAME_STEP = 4
 
-# What one "cost unit" is: the safe 8 GB starting point. The UI compares any chosen
-# size against this so you can see how much more you are asking of the card.
+# Sanity bounds only — deliberately generous so this runs unchanged on a bigger GPU.
+# Nothing here is tuned to the RTX 3050. Raise them in config/runtime.env if needed.
+MIN_DIM = 128
+MAX_DIM = int(os.environ.get("UI_MAX_DIM", "4096"))
+MIN_FRAMES = 5
+MAX_FRAMES = int(os.environ.get("UI_MAX_FRAMES", "1001"))
+
+# Reference point for the cost display: the largest setting confirmed comfortable on an
+# 8 GiB card. The UI rescales this against whatever GPU is actually detected, so the
+# guidance follows the hardware instead of assuming it.
 BASELINE_COST = 512 * 288 * 41
+BASELINE_VRAM_GIB = 8.0
 
 DEFAULTS = {
     "preset": "512x288",

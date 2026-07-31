@@ -6,6 +6,7 @@ let OPTIONS = null;
 let JOBS = [];
 let openJobId = null;
 let pickedFile = null;
+let GPU = null;          // whatever card this instance is actually talking to
 
 // ------------------------------------------------------------------ helpers
 
@@ -105,7 +106,8 @@ function chosenFrames() {
     ? Number($('framesCustom').value) || 0
     : Number($('frames').value);
   // Wan needs length = 4n + 1; show what the server will actually use.
-  return raw - ((raw - 1) % 4);
+  const step = OPTIONS.limits.frame_step;
+  return raw - ((raw - 1) % step);
 }
 
 const snap = (value) => {
@@ -124,32 +126,42 @@ function updateNotes() {
   const fps = Number($('fps').value) || 24;
   const limits = OPTIONS.limits;
 
-  const cost = (width * height * frames) / limits.baseline_cost;
+  const pixelFrames = width * height * frames;
   const seconds = frames / fps;
+
+  // The reference point is a setting known comfortable on an 8 GiB card. Rescale it
+  // for whatever GPU is actually attached, so this stays meaningful on other machines.
+  const vram = GPU && GPU.vram_total ? GPU.vram_total / 1024 ** 3 : null;
+  const scale = vram ? vram / limits.baseline_vram_gib : 1;
+  const budget = limits.baseline_cost * scale;
+  const cost = pixelFrames / budget;
 
   $('costLabel').textContent =
     `${width}×${height} · ${frames} frames · ${seconds.toFixed(1)}s @ ${fps}fps`;
-  $('costFactor').textContent = `${cost.toFixed(1)}× baseline`;
+  $('costFactor').textContent =
+    `${(pixelFrames / 1e6).toFixed(1)} MP·frames · ${cost.toFixed(1)}× reference`;
 
-  // Bar fills up at 4x the safe baseline, which is roughly where 8 GB gives out.
   const fill = Math.min(100, (cost / 4) * 100);
   const bar = $('costFill');
   bar.style.width = `${fill}%`;
   bar.className = cost <= 1.2 ? 'ok' : cost <= 2.5 ? 'warn' : 'bad';
 
+  const card = vram
+    ? `${GPU.name.replace(/^cuda:\d+\s*/, '')} (${vram.toFixed(1)} GiB)`
+    : 'the current GPU';
+
   let note;
-  if (width * height > limits.max_pixels) {
-    note = `Too large: ${(width * height).toLocaleString()} pixels, limit is `
-         + `${limits.max_pixels.toLocaleString()}.`;
-  } else if (isCustomSize && (snap(width) !== width || snap(height) !== height)) {
+  if (isCustomSize && (snap(width) !== width || snap(height) !== height)) {
     note = `Will be rounded to ${snap(width)}×${snap(height)} — Wan needs `
          + `multiples of ${limits.dim_step}.`;
   } else if (cost <= 1.2) {
-    note = 'Comfortable on 8 GB.';
+    note = `Comfortable for ${card}.`;
   } else if (cost <= 2.5) {
-    note = 'Heavier than the safe baseline — expect more offloading and a longer render.';
+    note = `Heavier than the reference for ${card} — expect more offloading and a `
+         + 'longer render.';
   } else {
-    note = 'Well beyond the 8 GB baseline. May run very slowly or run out of memory.';
+    note = `Well beyond the reference for ${card}. It will be slow and may run out of `
+         + 'memory — nothing stops you trying.';
   }
   $('costNote').textContent = note;
 }
@@ -166,6 +178,7 @@ async function refreshStatus() {
       text.textContent = 'ComfyUI offline — run ./scripts/comfy.sh wan';
       return;
     }
+    GPU = status.gpu || null;
     dot.className = status.current ? 'dot busy' : 'dot up';
     const bits = [`ComfyUI ${status.comfy_version || 'up'}`];
     if (status.gpu && status.gpu.vram_free != null) {
@@ -173,6 +186,7 @@ async function refreshStatus() {
     }
     if (status.queued) bits.push(`${status.queued} queued`);
     text.textContent = bits.join(' · ');
+    updateNotes();   // cost guidance depends on the detected GPU
   } catch {
     $('statusDot').className = 'dot down';
     $('statusText').textContent = 'service unreachable';

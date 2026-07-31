@@ -29,14 +29,15 @@ from PIL import Image
 import jobs as jobstore
 from config import (
     BASELINE_COST,
+    BASELINE_VRAM_GIB,
     DATA_DIR,
     DEFAULTS,
     DEFAULT_NEGATIVE,
     FRAME_CHOICES,
     DIM_STEP,
+    FRAME_STEP,
     MAX_DIM,
     MAX_FRAMES,
-    MAX_PIXELS,
     MAX_UPLOAD_BYTES,
     MIN_DIM,
     MIN_FRAMES,
@@ -133,10 +134,11 @@ async def options():
             "min_dim": MIN_DIM,
             "max_dim": MAX_DIM,
             "dim_step": DIM_STEP,
-            "max_pixels": MAX_PIXELS,
+            "frame_step": FRAME_STEP,
             "min_frames": MIN_FRAMES,
             "max_frames": MAX_FRAMES,
             "baseline_cost": BASELINE_COST,
+            "baseline_vram_gib": BASELINE_VRAM_GIB,
         },
         "default_negative": DEFAULT_NEGATIVE,
         "max_upload_mb": MAX_UPLOAD_BYTES // (1024 * 1024),
@@ -188,14 +190,10 @@ async def generate(
         raise HTTPException(400, "a prompt is required")
 
     if preset == "custom":
+        # Only the model's own constraints are enforced. How much the GPU can take is
+        # the operator's call: the UI shows the cost, it does not veto it.
         width = snap(parse_int(width, 512, MIN_DIM, MAX_DIM))
         height = snap(parse_int(height, 288, MIN_DIM, MAX_DIM))
-        if width * height > MAX_PIXELS:
-            raise HTTPException(
-                400,
-                f"{width}×{height} is {width * height:,} pixels; the limit is "
-                f"{MAX_PIXELS:,} ({MAX_PIXELS // 704}×704). Reduce the size.",
-            )
     elif preset in PRESETS:
         width, height, _ = PRESETS[preset]
     else:
@@ -203,7 +201,7 @@ async def generate(
 
     frames = parse_int(frames, DEFAULTS["frames"], MIN_FRAMES, MAX_FRAMES)
     # Wan needs length = 4n + 1.
-    frames = frames - ((frames - 1) % 4)
+    frames = frames - ((frames - 1) % FRAME_STEP)
 
     steps = parse_int(steps, DEFAULTS["steps"], 1, 60)
     fps = parse_int(fps, DEFAULTS["fps"], 1, 60)

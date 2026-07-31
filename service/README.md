@@ -25,8 +25,7 @@ fixed API-format workflow from `workflows/api/` and substitutes only typed field
 (prompt, seed, size, frames, steps). ComfyUI's `/prompt` executes whatever graph it is
 handed, so accepting a caller-supplied graph would be arbitrary execution on this
 workstation. Uploaded images are re-encoded to PNG with Pillow rather than passed
-through, and resolution and frame count come from a server-side allowlist so nobody can
-ask for 1280×704 × 121 frames and OOM the card.
+through.
 
 ## Layout
 
@@ -85,6 +84,11 @@ If node ids shift, update the `NODE_*` constants in `config.py`.
 
 ## Notes
 
+- Resolution and frame count are not capped to this GPU. The only enforced rules are
+  the model's own: dimensions snap to multiples of 16, frame count to 4n + 1. The form
+  shows the cost of a setting, rescaled against whatever GPU is detected, and warns —
+  but never refuses. Raise `UI_MAX_DIM` / `UI_MAX_FRAMES` in `config/runtime.env` if the
+  sanity bounds (4096 px, 1001 frames) get in your way on a bigger machine.
 - One render at a time. Extra requests queue; the UI shows queue position.
 - The first render of a session loads ~18 GB of weights and is much slower than later
   ones.
