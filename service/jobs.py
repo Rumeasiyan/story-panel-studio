@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from comfy_client import ComfyClient, ComfyError, outputs_from_history
-from config import DB_PATH, OUTPUT_DIR, THUMB_DIR
+from config import DATA_DIR, DB_PATH, INPUT_DIR, OUTPUT_DIR, THUMB_DIR
 import workflow
 
 SCHEMA = """
@@ -137,23 +137,47 @@ def count_jobs() -> int:
         return conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
 
 
+def _unlink_under(base: Path, relative: str | None) -> None:
+    """Delete `relative` inside `base`, refusing anything that escapes it."""
+    if not relative:
+        return
+    base = base.resolve()
+    target = (base / relative).resolve()
+    if target == base or (base not in target.parents and target.parent != base):
+        return
+    if target.is_file():
+        target.unlink(missing_ok=True)
+
+
 def delete_job(job_id: str) -> bool:
-    """Remove a job and everything it produced: video, thumbnail, history row."""
+    """Remove a job and every trace of it this service controls.
+
+    The video, the thumbnail, the normalised upload, ComfyUI's own copy of the input
+    image, and the history row. The row holds the prompt and seed, and SQLite keeps
+    deleted rows in free pages until the database is vacuumed, so vacuum too.
+
+    Not covered here because it needs the running engine: ComfyUI's in-memory history.
+    The API route purges that first; scripts/forget-generation does it for offline use.
+    """
     job = get_job(job_id)
     if job is None:
         return False
 
-    for key, base in (("video_path", OUTPUT_DIR), ("thumb_path", THUMB_DIR)):
-        relative = job.get(key)
-        if not relative:
-            continue
-        target = (base / relative).resolve()
-        # Never follow a path out of its own directory.
-        if base.resolve() in target.parents and target.is_file():
-            target.unlink(missing_ok=True)
+    _unlink_under(OUTPUT_DIR, job.get("video_path"))
+    _unlink_under(THUMB_DIR, job.get("thumb_path"))
+    _unlink_under(DATA_DIR / "uploads", job.get("image_name"))
+    # ComfyUI copies every upload into its own input directory and keeps it there.
+    _unlink_under(INPUT_DIR, job.get("image_name"))
 
     with connect() as conn:
         conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
+    # VACUUM cannot run inside a transaction, so use a fresh connection.
+    conn = connect()
+    try:
+        conn.isolation_level = None
+        conn.execute("VACUUM")
+    finally:
+        conn.close()
     return True
 
 

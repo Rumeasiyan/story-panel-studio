@@ -104,6 +104,60 @@ profiles:
         licence_url: https://huggingface.co/Wan-AI/Wan2.2-TI2V-5B
         commercial_review_required: false
 
+  wan21-fun-inp-1.3b:
+    description: Wan 2.1 Fun-InP 1.3B — fast image-to-video for iteration
+    engine: comfyui
+    workflow_family: wan21-fun-inp
+    notes: >-
+      Small enough to render 480p comfortably on 8 GB, roughly 3-5x faster than
+      Wan 2.2 TI2V-5B. Takes a start image and an optional end image. Runs at
+      16 fps natively, so 5 seconds is 81 frames rather than 121. Intended for
+      drafting prompts cheaply before committing a keeper to the 5B model at 720p.
+      Reuses the umt5 text encoder already installed by wan22-ti2v-5b.
+    artifacts:
+      - id: wan21-fun-inp-1.3b
+        repository: Comfy-Org/Wan_2.1_ComfyUI_repackaged
+        revision: 06e001fc51048fb03433a6fb25334de7836704a5
+        filename: split_files/diffusion_models/wan2.1_fun_inp_1.3B_bf16.safetensors
+        destination: models/diffusion_models
+        size_bytes: 3128957992
+        sha256: 8495d2b1673ffb18abb548a64ff3b0e4bd367734f653096f7a8a3ad46954d511
+        licence: Apache-2.0
+        licence_url: https://huggingface.co/alibaba-pai/Wan2.1-Fun-1.3B-InP
+        commercial_review_required: false
+      - id: wan21-vae
+        repository: Comfy-Org/Wan_2.1_ComfyUI_repackaged
+        revision: 06e001fc51048fb03433a6fb25334de7836704a5
+        filename: split_files/vae/wan_2.1_vae.safetensors
+        destination: models/vae
+        size_bytes: 253815318
+        sha256: 2fc39d31359a4b0a64f55876d8ff7fa8d780956ae2cb13463b0223e15148976b
+        licence: Apache-2.0
+        licence_url: https://huggingface.co/Wan-AI/Wan2.1-T2V-1.3B
+        commercial_review_required: false
+      - id: clip-vision-h
+        repository: Comfy-Org/Wan_2.1_ComfyUI_repackaged
+        revision: 06e001fc51048fb03433a6fb25334de7836704a5
+        filename: split_files/clip_vision/clip_vision_h.safetensors
+        destination: models/clip_vision
+        size_bytes: 1264219396
+        sha256: 64a7ef761bfccbadbaa3da77366aac4185a6c58fa5de5f589b42a65bcc21f161
+        licence: Apache-2.0
+        licence_url: https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged
+        commercial_review_required: false
+      # Shared with wan22-ti2v-5b. Already on disk if that profile is installed;
+      # listed here so a fresh machine gets it from this profile alone.
+      - id: umt5-xxl-fp8-scaled
+        repository: Comfy-Org/Wan_2.2_ComfyUI_Repackaged
+        revision: fb1388adc906ab39ffc26ee40e96b22886b56bc4
+        filename: split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors
+        destination: models/text_encoders
+        size_bytes: 6735906897
+        sha256: c3355d30191f1f066b26d93fba017ae9809dce6c627dda5f6a66eaa651204f68
+        licence: Apache-2.0
+        licence_url: https://huggingface.co/Wan-AI/Wan2.2-TI2V-5B
+        commercial_review_required: false
+
 # Future profiles (newer anime/cinematic checkpoints, Wan 2.1, quantized variants,
 # LoRA packs, private character LoRAs, API-only providers) are added by appending
 # entries here. Nothing is downloaded until `./scripts/modelctl install <profile>`

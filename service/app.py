@@ -289,6 +289,12 @@ async def api_cancel(job_id: str):
 async def api_delete(job_id: str):
     if runner.current == job_id:
         raise HTTPException(409, "cannot delete a job while it is rendering")
+    job = jobstore.get_job(job_id)
+    if job is None:
+        raise HTTPException(404, "no such job")
+    # Purge the engine's own copy of the prompt before dropping our record of it.
+    if job.get("prompt_id"):
+        await runner.client.forget_history(job["prompt_id"])
     if not jobstore.delete_job(job_id):
         raise HTTPException(404, "no such job")
     return {"ok": True}

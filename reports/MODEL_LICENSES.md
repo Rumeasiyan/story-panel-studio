@@ -58,3 +58,22 @@ independently before commercial use.
 None installed. When adding one, append a row with: filename, source URL, pinned
 revision, size, SHA-256, licence, and whether commercial use is permitted. Private
 character LoRAs go in `models/private/` (gitignored) and must never be committed.
+
+## wan21-fun-inp-1.3b
+
+Fast image-to-video drafting model. All files from
+[Comfy-Org/Wan_2.1_ComfyUI_repackaged](https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged)
+at pinned revision `06e001fc51048fb03433a6fb25334de7836704a5`. Resolved 2026-08-01.
+
+The repackaged repository declares no licence in its metadata. The upstream sources do:
+[alibaba-pai/Wan2.1-Fun-1.3B-InP](https://huggingface.co/alibaba-pai/Wan2.1-Fun-1.3B-InP)
+and [Wan-AI/Wan2.1-T2V-1.3B](https://huggingface.co/Wan-AI/Wan2.1-T2V-1.3B) are both
+**Apache-2.0**, which is what is recorded here. Re-verify before commercial release.
+
+| Artifact | Size | SHA-256 | Destination |
+|---|---|---|---|
+| `wan2.1_fun_inp_1.3B_bf16.safetensors` | 3,128,957,992 B (3.13 GB) | `8495d2b1673ffb18abb548a64ff3b0e4bd367734f653096f7a8a3ad46954d511` | `models/diffusion_models/` |
+| `wan_2.1_vae.safetensors` | 253,815,318 B (0.25 GB) | `2fc39d31359a4b0a64f55876d8ff7fa8d780956ae2cb13463b0223e15148976b` | `models/vae/` |
+| `clip_vision_h.safetensors` | 1,264,219,396 B (1.26 GB) | `64a7ef761bfccbadbaa3da77366aac4185a6c58fa5de5f589b42a65bcc21f161` | `models/clip_vision/` |
+
+The umt5 text encoder is shared with `wan22-ti2v-5b` and is not downloaded twice.

@@ -1,0 +1,271 @@
+#!/usr/bin/env python3
+"""forget-generation — erase every local trace of a generation.
+
+    ./scripts/forget-generation <job-id> [<job-id> ...]
+    ./scripts/forget-generation --all            # every generation, ever
+    ./scripts/forget-generation <job-id> --shred # overwrite file bytes first
+    ./scripts/forget-generation --audit          # find residue without deleting
+
+A single generation leaves data in seven places. The UI's delete button and this tool
+both clear all of them; this tool additionally works with the service stopped, handles
+bulk deletion, and can verify afterwards.
+
+  1. output/video/<id>_*.mp4        the render — and its metadata embeds the FULL
+                                    prompt, negative prompt and seed
+  2. service/data/uploads/<id>.png  the normalised start image
+  3. service/data/thumbs/<id>.jpg   the thumbnail
+  4. input/<id>.png                 ComfyUI's own copy of the start image
+  5. service/data/app.db            the history row: prompt, seed, every parameter
+                                    (plus -wal and -shm sidecars)
+  6. ComfyUI in-memory history      holds the prompt again; cleared via its API, and
+                                    lost anyway when the engine restarts
+  7. free pages in app.db           SQLite keeps deleted rows until VACUUM
+
+What this cannot promise: unlinking a file does not erase the bytes from the disk.
+--shred overwrites them first, but on an SSD wear levelling may keep old copies in
+cells the OS cannot address. If the machine's storage is LUKS-encrypted, those remnants
+are unreadable once it is powered off, which is the protection that actually holds.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sqlite3
+import subprocess
+import sys
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "service"))
+
+DATA_DIR = ROOT / "service" / "data"
+DB_PATH = DATA_DIR / "app.db"
+UPLOAD_DIR = DATA_DIR / "uploads"
+THUMB_DIR = DATA_DIR / "thumbs"
+OUTPUT_DIR = ROOT / "output"
+INPUT_DIR = ROOT / "input"
+TEMP_DIR = ROOT / "temp"
+
+COMFY_URL = os.environ.get("COMFY_URL", "http://127.0.0.1:8188")
+
+
+def colour(code: str, text: str) -> str:
+    return f"\033[{code}m{text}\033[0m" if sys.stdout.isatty() else text
+
+
+def green(t): return colour("0;32", t)
+def red(t): return colour("0;31", t)
+def yellow(t): return colour("0;33", t)
+def bold(t): return colour("1", t)
+
+
+def connect() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def shred(path: Path) -> None:
+    """Overwrite then remove. Best effort — see the caveat in the module docstring."""
+    subprocess.run(["shred", "-u", "-n", "3", str(path)], capture_output=True)
+
+
+def remove(path: Path, use_shred: bool, removed: list[str]) -> None:
+    if not path.is_file():
+        return
+    if use_shred:
+        shred(path)
+        if path.exists():
+            path.unlink(missing_ok=True)
+    else:
+        path.unlink(missing_ok=True)
+    removed.append(str(path.relative_to(ROOT)))
+
+
+def comfy_forget(prompt_id: str | None) -> str:
+    body = json.dumps({"delete": [prompt_id]} if prompt_id else {"clear": True})
+    request = urllib.request.Request(
+        f"{COMFY_URL}/history", data=body.encode(),
+        headers={"Content-Type": "application/json"}, method="POST",
+    )
+    try:
+        urllib.request.urlopen(request, timeout=5).read()
+        return "cleared"
+    except (urllib.error.URLError, OSError):
+        return "engine not running (its history is in memory only, so it is already gone)"
+
+
+def vacuum() -> None:
+    """Reclaim free pages so deleted rows stop lingering in the file."""
+    conn = sqlite3.connect(DB_PATH, timeout=30)
+    try:
+        conn.isolation_level = None
+        conn.execute("VACUUM")
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    finally:
+        conn.close()
+
+
+def forget(job_ids: list[str], use_shred: bool) -> int:
+    if not DB_PATH.exists():
+        print("no database; nothing to forget")
+        return 0
+
+    conn = connect()
+    rows = {
+        r["id"]: r for r in conn.execute(
+            "SELECT * FROM jobs WHERE id IN (%s)" % ",".join("?" * len(job_ids)),
+            job_ids,
+        ).fetchall()
+    }
+    conn.close()
+
+    missing = [j for j in job_ids if j not in rows]
+    for job_id in missing:
+        print(yellow(f"no history row for {job_id} — checking the filesystem anyway"))
+
+    for job_id in job_ids:
+        row = rows.get(job_id)
+        removed: list[str] = []
+        print(bold(f"\n{job_id}"))
+        if row:
+            print(f"  prompt: {row['prompt'][:70]}")
+
+        # 1. rendered video(s) — glob, since ComfyUI appends its own counter
+        for path in sorted(OUTPUT_DIR.rglob(f"{job_id}*")):
+            remove(path, use_shred, removed)
+        # 2-4. images
+        remove(UPLOAD_DIR / f"{job_id}.png", use_shred, removed)
+        remove(THUMB_DIR / f"{job_id}.jpg", use_shred, removed)
+        remove(INPUT_DIR / f"{job_id}.png", use_shred, removed)
+        for path in sorted(TEMP_DIR.rglob(f"{job_id}*")):
+            remove(path, use_shred, removed)
+
+        # 6. the engine's in-memory history
+        if row is not None:
+            print(f"  comfyui history: {comfy_forget(row['prompt_id'])}")
+
+        # 5. the history row
+        if row is not None:
+            conn = connect()
+            with conn:
+                conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
+            conn.close()
+            removed.append("history row in service/data/app.db")
+
+        for item in removed:
+            print(f"  {green('removed')} {item}")
+        if not removed:
+            print("  nothing found")
+
+    # 7. free pages
+    vacuum()
+    print(f"\n{green('vacuumed')} service/data/app.db (deleted rows reclaimed)")
+    return 0
+
+
+def audit(job_ids: list[str] | None) -> int:
+    """Look for anything still referencing these jobs."""
+    print(bold("audit"))
+    hits = 0
+
+    targets = job_ids or []
+    search_dirs = [OUTPUT_DIR, UPLOAD_DIR, THUMB_DIR, INPUT_DIR, TEMP_DIR]
+
+    for job_id in targets:
+        for base in search_dirs:
+            for path in sorted(base.rglob(f"*{job_id}*")):
+                print(f"  {red('FOUND')} {path.relative_to(ROOT)}")
+                hits += 1
+
+    if DB_PATH.exists():
+        conn = connect()
+        if targets:
+            rows = conn.execute(
+                "SELECT id FROM jobs WHERE id IN (%s)" % ",".join("?" * len(targets)),
+                targets,
+            ).fetchall()
+            for row in rows:
+                print(f"  {red('FOUND')} history row {row['id']}")
+                hits += 1
+        total = conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
+        conn.close()
+        print(f"  history rows remaining: {total}")
+
+        # Deleted rows can survive in free pages until VACUUM.
+        raw = DB_PATH.read_bytes()
+        for job_id in targets:
+            if job_id.encode() in raw:
+                print(f"  {red('FOUND')} '{job_id}' still present in app.db bytes "
+                      "(run without --audit to vacuum)")
+                hits += 1
+
+    try:
+        with urllib.request.urlopen(f"{COMFY_URL}/history", timeout=3) as response:
+            entries = json.load(response)
+        print(f"  comfyui in-memory history entries: {len(entries)}")
+        if entries and not targets:
+            hits += len(entries)
+    except (urllib.error.URLError, OSError):
+        print("  comfyui not running (its history is memory-only)")
+
+    print()
+    print(green("clean — no residue found") if hits == 0
+          else red(f"{hits} item(s) still present"))
+    return 1 if hits else 0
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("job_ids", nargs="*", help="job ids to erase")
+    parser.add_argument("--all", action="store_true", help="erase every generation")
+    parser.add_argument("--shred", action="store_true",
+                        help="overwrite file contents before unlinking (see caveats)")
+    parser.add_argument("--audit", action="store_true",
+                        help="report residue without deleting anything")
+    parser.add_argument("--yes", action="store_true", help="skip confirmation")
+    args = parser.parse_args()
+
+    if args.all:
+        if not DB_PATH.exists():
+            print("no database; nothing to forget")
+            return 0
+        conn = connect()
+        ids = [r["id"] for r in conn.execute("SELECT id FROM jobs").fetchall()]
+        conn.close()
+        # Catch orphans whose row is already gone but whose files are not.
+        for base in (OUTPUT_DIR, UPLOAD_DIR, THUMB_DIR):
+            for path in base.rglob("*"):
+                if path.is_file():
+                    stem = path.name.split("_")[0].split(".")[0]
+                    if len(stem) == 12 and stem not in ids:
+                        ids.append(stem)
+        args.job_ids = sorted(set(ids))
+        if not args.job_ids:
+            print("nothing to forget")
+            return 0
+
+    if args.audit:
+        return audit(args.job_ids or None)
+
+    if not args.job_ids:
+        parser.error("give at least one job id, or --all")
+
+    print(f"About to permanently erase {len(args.job_ids)} generation(s): "
+          f"{', '.join(args.job_ids)}")
+    print("This removes videos, start images, thumbnails, history rows and prompts.")
+    if not args.yes and sys.stdin.isatty():
+        if input("Continue? [y/N] ").strip().lower() not in ("y", "yes"):
+            print("aborted")
+            return 1
+
+    return forget(args.job_ids, args.shred)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

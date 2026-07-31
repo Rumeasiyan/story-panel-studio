@@ -2,7 +2,7 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
 .PHONY: help bootstrap bootstrap-core doctor run run-lowvram run-wan \
-        models model-status repo-check snapshot update nodes serve serve-ui
+        models model-status repo-check snapshot update nodes serve serve-ui forget forget-all audit
 
 help: ## Show this help
 	@echo "ai-video-gen — available targets"
@@ -53,3 +53,12 @@ serve: ## Start the local web UI (and ComfyUI behind it)
 
 serve-ui: ## Start only the web UI (ComfyUI must already be running)
 	./scripts/serve.sh --no-engine
+
+forget: ## Erase a generation completely: make forget JOB=<id>
+	./scripts/forget-generation $(JOB)
+
+forget-all: ## Erase EVERY generation and its files
+	./scripts/forget-generation --all
+
+audit: ## Report any generation residue left on disk
+	./scripts/forget-generation --audit

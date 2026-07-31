@@ -125,6 +125,19 @@ class ComfyClient:
         except Exception:
             pass
 
+    async def forget_history(self, prompt_id: str | None = None) -> None:
+        """Drop one prompt (or all of them) from ComfyUI's in-memory history.
+
+        That history holds the full prompt text and seed, so it must go too.
+        """
+        session = await self.session()
+        body = {"delete": [prompt_id]} if prompt_id else {"clear": True}
+        try:
+            async with session.post(f"{COMFY_URL}/history", json=body) as response:
+                await response.read()
+        except Exception:
+            pass
+
     async def history(self, prompt_id: str) -> dict | None:
         session = await self.session()
         async with session.get(f"{COMFY_URL}/history/{prompt_id}") as response:

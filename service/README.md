@@ -49,8 +49,38 @@ through.
 | Thumbnail | `service/data/thumbs/<job-id>.jpg` |
 | History | `service/data/app.db` |
 
-Deleting a job from the UI removes its row, its video, and its thumbnail. The copy in
-`input/` is left alone — clear that yourself if you care.
+## Deleting a generation completely
+
+One generation leaves data in seven places, two of them non-obvious: the **mp4 embeds
+the full prompt, negative prompt and seed** in its metadata, and **ComfyUI keeps its own
+copy** of the start image in `input/` plus the prompt in its in-memory history.
+
+The UI's delete button and `scripts/forget-generation` both clear all seven:
+
+| # | Location | Holds |
+|---|---|---|
+| 1 | `output/video/<id>_*.mp4` | the render, and the prompt in its metadata |
+| 2 | `service/data/uploads/<id>.png` | the normalised start image |
+| 3 | `service/data/thumbs/<id>.jpg` | the thumbnail |
+| 4 | `input/<id>.png` | ComfyUI's own copy of the start image |
+| 5 | `service/data/app.db` | history row: prompt, seed, every parameter |
+| 6 | ComfyUI in-memory history | the prompt again |
+| 7 | free pages in `app.db` | deleted rows, until `VACUUM` |
+
+```bash
+./scripts/forget-generation <job-id>          # one generation
+./scripts/forget-generation --all             # everything, ever
+./scripts/forget-generation <job-id> --shred  # overwrite bytes before unlinking
+./scripts/forget-generation --audit           # report residue, delete nothing
+```
+
+`--audit` is the proof: it re-scans every location, including raw bytes of the database,
+and exits non-zero if anything remains.
+
+Unlinking a file does not erase its bytes from the disk. `--shred` overwrites them
+first, but on an SSD wear levelling can keep old copies in cells the OS cannot address.
+If the drive is LUKS-encrypted, those remnants are unreadable once the machine is
+powered off — that is the protection that actually holds.
 
 ## API
 
