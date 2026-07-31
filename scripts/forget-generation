@@ -22,9 +22,17 @@ bulk deletion, and can verify afterwards.
   7. free pages in app.db           SQLite keeps deleted rows until VACUUM
 
 What this cannot promise: unlinking a file does not erase the bytes from the disk.
---shred overwrites them first, but on an SSD wear levelling may keep old copies in
-cells the OS cannot address. If the machine's storage is LUKS-encrypted, those remnants
-are unreadable once it is powered off, which is the protection that actually holds.
+
+--shred overwrites a file in place before unlinking, but that only works on a
+filesystem that overwrites in place. On copy-on-write filesystems (btrfs, ZFS) it does
+not: the overwrite is written to NEW blocks and the original content stays put. SSD wear
+levelling defeats it as well, by keeping old copies in cells the OS cannot address. The
+tool warns when it detects a CoW filesystem.
+
+What actually protects deleted remnants is full-disk encryption: on a LUKS volume they
+are unreadable once the machine is powered off. Snapshots are the other thing to check —
+`sudo btrfs subvolume list /` — because a snapshot keeps every deleted file regardless of
+what this tool does.
 """
 
 from __future__ import annotations
@@ -69,8 +77,37 @@ def connect() -> sqlite3.Connection:
     return conn
 
 
+# Filesystems that never overwrite in place, so shredding a file cannot erase its
+# previous contents.
+COW_FILESYSTEMS = {"btrfs", "zfs", "bcachefs"}
+
+
+def filesystem_of(path: Path) -> str:
+    try:
+        return subprocess.run(
+            ["findmnt", "-no", "FSTYPE", "--target", str(path)],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+    except Exception:
+        return "unknown"
+
+
+def warn_if_shred_is_useless(use_shred: bool) -> None:
+    if not use_shred:
+        return
+    fstype = filesystem_of(ROOT)
+    if fstype in COW_FILESYSTEMS:
+        print(yellow(
+            f"warning: {ROOT} is on {fstype}, a copy-on-write filesystem.\n"
+            "         --shred overwrites into NEW blocks; the original content is left\n"
+            "         behind untouched. It cannot do what its name implies here.\n"
+            "         Rely on full-disk encryption instead, and check for snapshots\n"
+            f"         with: sudo btrfs subvolume list /\n"
+        ))
+
+
 def shred(path: Path) -> None:
-    """Overwrite then remove. Best effort — see the caveat in the module docstring."""
+    """Overwrite then remove. Only meaningful on an overwrite-in-place filesystem."""
     subprocess.run(["shred", "-u", "-n", "3", str(path)], capture_output=True)
 
 
@@ -225,7 +262,8 @@ def main() -> int:
     parser.add_argument("job_ids", nargs="*", help="job ids to erase")
     parser.add_argument("--all", action="store_true", help="erase every generation")
     parser.add_argument("--shred", action="store_true",
-                        help="overwrite file contents before unlinking (see caveats)")
+                        help="overwrite file contents before unlinking; useless on "
+                             "copy-on-write filesystems, which it warns about")
     parser.add_argument("--audit", action="store_true",
                         help="report residue without deleting anything")
     parser.add_argument("--yes", action="store_true", help="skip confirmation")
@@ -264,6 +302,7 @@ def main() -> int:
             print("aborted")
             return 1
 
+    warn_if_shred_is_useless(args.shred)
     return forget(args.job_ids, args.shred)
 
 

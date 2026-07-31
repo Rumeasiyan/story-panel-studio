@@ -77,10 +77,17 @@ The UI's delete button and `scripts/forget-generation` both clear all seven:
 `--audit` is the proof: it re-scans every location, including raw bytes of the database,
 and exits non-zero if anything remains.
 
-Unlinking a file does not erase its bytes from the disk. `--shred` overwrites them
-first, but on an SSD wear levelling can keep old copies in cells the OS cannot address.
-If the drive is LUKS-encrypted, those remnants are unreadable once the machine is
-powered off — that is the protection that actually holds.
+Unlinking a file does not erase its bytes from the disk, and `--shred` is weaker than
+it sounds:
+
+- On **copy-on-write filesystems (btrfs, ZFS, bcachefs)** an in-place overwrite is
+  written to *new* blocks, leaving the original content untouched. `--shred` cannot do
+  what its name implies. It warns when it detects one.
+- On **SSDs**, wear levelling keeps old copies in cells the OS cannot address.
+- **Snapshots** retain everything regardless. Check with `sudo btrfs subvolume list /`.
+
+What actually protects remnants is full-disk encryption: on a LUKS volume they are
+unreadable once the machine is powered off.
 
 ## API
 
