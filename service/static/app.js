@@ -150,6 +150,13 @@ function updateNotes() {
     ? `${GPU.name.replace(/^cuda:\d+\s*/, '')} (${vram.toFixed(1)} GiB)`
     : 'the current GPU';
 
+  // Wan 2.2 TI2V-5B was trained on clips of up to 121 frames (5s at 24fps). Past
+  // that it still runs, but coherence drifts — worth saying before the render, not after.
+  const beyondTraining = frames > 121
+    ? ` Note: ${frames} frames is past the ${'121'}-frame (5s @ 24fps) length Wan 2.2 was `
+      + 'trained on — expect drift or looping.'
+    : '';
+
   let note;
   if (isCustomSize && (snap(width) !== width || snap(height) !== height)) {
     note = `Will be rounded to ${snap(width)}×${snap(height)} — Wan needs `
@@ -163,7 +170,7 @@ function updateNotes() {
     note = `Well beyond the reference for ${card}. It will be slow and may run out of `
          + 'memory — nothing stops you trying.';
   }
-  $('costNote').textContent = note;
+  $('costNote').textContent = note + beyondTraining;
 }
 
 // ------------------------------------------------------------------ status
