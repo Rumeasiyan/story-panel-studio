@@ -104,6 +104,49 @@ profiles:
         licence_url: https://huggingface.co/Wan-AI/Wan2.2-TI2V-5B
         commercial_review_required: false
 
+  flux2-klein-4b:
+    description: FLUX.2 klein 4B — image generation and instruction editing
+    engine: comfyui
+    workflow_family: flux2-klein
+    notes: >-
+      Unified model: text-to-image and instruction editing ("change the background to
+      night") plus multi-reference editing, in one checkpoint. Distilled to 4 steps, so
+      it stays usable on 8 GB despite the fp8 weights needing offloading. The official
+      ComfyUI templates image_flux2_klein_text_to_image and
+      image_flux2_klein_image_edit_4b_distilled drive it.
+      The 8 GB text encoder dominates the download; it is shared by both templates.
+    artifacts:
+      - id: flux2-klein-4b-fp8
+        repository: black-forest-labs/FLUX.2-klein-4b-fp8
+        revision: 5b4408e59397a4a37ccb46afe426d8ed86379441
+        filename: flux-2-klein-4b-fp8.safetensors
+        destination: models/diffusion_models
+        size_bytes: 4070624520
+        sha256: 15005cf50d1361f75c61f7d213d7969063e2aaea7523beefe5d1e085d173568d
+        licence: Apache-2.0
+        licence_url: https://huggingface.co/black-forest-labs/FLUX.2-klein-4B
+        commercial_review_required: false
+      - id: qwen3-4b-text-encoder
+        repository: Comfy-Org/z_image_turbo
+        revision: d24c4cf2a0cd98a42f23467e27e3d76ee9438b8e
+        filename: split_files/text_encoders/qwen_3_4b.safetensors
+        destination: models/text_encoders
+        size_bytes: 8044982048
+        sha256: f459cd74b7868799ea82f97601a650afcedc399596dc262f302e3505761c9995
+        licence: Apache-2.0 (Qwen3 upstream; repackaged repo declares none)
+        licence_url: https://huggingface.co/Qwen/Qwen3-4B
+        commercial_review_required: true
+      - id: flux2-vae
+        repository: Comfy-Org/flux2-dev
+        revision: 03d6521e6f6a47396b3f951cbea50f7e6c2f482e
+        filename: split_files/vae/flux2-vae.safetensors
+        destination: models/vae
+        size_bytes: 336213556
+        sha256: bb534d41e8e6f92dc8636b914489b7167aeb950418183ffc10768c573185683a
+        licence: VERIFY — repository declares "other", not Apache-2.0
+        licence_url: https://huggingface.co/Comfy-Org/flux2-dev
+        commercial_review_required: true
+
   wan21-fun-inp-1.3b:
     description: Wan 2.1 Fun-InP 1.3B — fast image-to-video for iteration
     engine: comfyui

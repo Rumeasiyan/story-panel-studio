@@ -77,3 +77,24 @@ and [Wan-AI/Wan2.1-T2V-1.3B](https://huggingface.co/Wan-AI/Wan2.1-T2V-1.3B) are 
 | `clip_vision_h.safetensors` | 1,264,219,396 B (1.26 GB) | `64a7ef761bfccbadbaa3da77366aac4185a6c58fa5de5f589b42a65bcc21f161` | `models/clip_vision/` |
 
 The umt5 text encoder is shared with `wan22-ti2v-5b` and is not downloaded twice.
+
+## flux2-klein-4b
+
+Unified image generation and instruction editing. Resolved 2026-08-01.
+
+| Artifact | Repo @ revision | Size | SHA-256 | Licence |
+|---|---|---|---|---|
+| `flux-2-klein-4b-fp8.safetensors` | `black-forest-labs/FLUX.2-klein-4b-fp8` @ `5b4408e5` | 4.07 GB | `15005cf50d1361f75c61f7d213d7969063e2aaea7523beefe5d1e085d173568d` | **Apache-2.0** |
+| `qwen_3_4b.safetensors` | `Comfy-Org/z_image_turbo` @ `d24c4cf2` | 8.04 GB | `f459cd74b7868799ea82f97601a650afcedc399596dc262f302e3505761c9995` | Qwen3 upstream is Apache-2.0; the repackaged repo declares none — **verify** |
+| `flux2-vae.safetensors` | `Comfy-Org/flux2-dev` @ `03d6521e` | 0.34 GB | `bb534d41e8e6f92dc8636b914489b7167aeb950418183ffc10768c573185683a` | repository declares **"other"**, not Apache-2.0 — **verify before commercial use** |
+
+The klein 4B weights themselves are Apache-2.0, which is unusually permissive for this
+family (FLUX.1 dev is non-commercial). The VAE ships from the FLUX.2 *dev* repository,
+whose licence field reads "other" — resolve that before shipping anything commercially,
+since the VAE is required to decode every image.
+
+## Image editing without extra models
+
+The SDXL checkpoints above also support image-to-image and inpainting natively through
+ComfyUI's built-in nodes. That covers denoise-guided transformation and masked
+regeneration; it does not cover instruction editing, which is what klein adds.
