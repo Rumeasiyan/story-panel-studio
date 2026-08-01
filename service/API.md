@@ -59,7 +59,7 @@ without changing routes.
 | `flux2-text-to-image` | image | — |
 | `flux2-edit` | image | `image`, `reference_2..4` |
 | `wan22-video` | video | `image` |
-| `tts-indicf5` | audio | `reference_audio` |
+| `tts-indicf5` | audio | `reference_audio` — **currently unavailable, see below** |
 | `tts-indic-parler` | audio | — |
 | `subtitles` | subtitle | `audio` |
 
@@ -177,6 +177,14 @@ GET    /api/voices/{name}/reference  the stored clip
 DELETE /api/voices/{name}
 ```
 
+> **IndicF5 is currently unavailable.** Its bundled remote code targets an older
+> f5-tts and an older transformers: on transformers 5.x it fails constructing the model
+> on a meta device, and pinning transformers to 4.46.1 exposes a `load_model()` signature
+> mismatch against every published f5-tts release. Its dependencies also conflict
+> directly with parler-tts, so the two cannot share an environment. The pipeline stays
+> registered and returns a clear explanation, so it becomes a working path again with no
+> API change if upstream fixes its packaging. **Use `tts-indic-parler` for now.**
+
 Cloned voice (IndicF5) — needs a clip and its exact transcript:
 
 ```bash
@@ -206,6 +214,20 @@ curl -X POST http://127.0.0.1:8189/api/generate \
 
 Profiles live in `service/data/voices/` and survive restarts. Four channels means four
 profiles — one per art-style/language pair.
+
+### Keeping a Parler voice stable
+
+Indic Parler picks its voice from the description, and the description is the only thing
+holding a narrator's identity. Two rules:
+
+1. Keep the description **byte-identical** across every episode. Store it once in a voice
+   profile and never retype it — that is what profiles are for.
+2. Name a specific speaker in the description. Indic Parler ships recommended speakers
+   per language, and naming one is far more reproducible than describing a voice in the
+   abstract.
+
+The description is encoded once per job and reused for every chunk, so a long narration
+does not drift within itself.
 
 ### Long narration
 
@@ -245,6 +267,7 @@ carries per-word timings for karaoke-style rendering.
 | FLUX.2 klein text-to-image, 4 steps | ~18 s |
 | FLUX.2 klein instruction edit | ~21 s |
 | Subtitles, script-aligned, base model | ~4 s |
+| Tamil narration, Indic Parler, ~10 s of speech | ~68 s |
 | Wan 2.2 video 720p 5s, 20 steps | ~27 min |
 
 Video is far more expensive than everything else. For still-panel story videos you

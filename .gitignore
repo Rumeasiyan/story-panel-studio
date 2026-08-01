@@ -71,3 +71,4 @@ logs/*.md
 # Local web UI runtime state (database, uploads, thumbnails)
 service/data/
 cache/object-info.json
+.venv-parler/

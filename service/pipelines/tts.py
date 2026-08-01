@@ -18,12 +18,15 @@ degrade on very long inputs. Every chunk uses the same voice, so the join is sea
 from __future__ import annotations
 
 import gc
+import json
 import re
+import subprocess
+import sys
 from pathlib import Path
 from typing import Callable
 
 import voices
-from config import MODELS_DIR, OUTPUT_DIR
+from config import MODELS_DIR, OUTPUT_DIR, ROOT
 
 from .base import LocalPipeline, Param, register
 
@@ -105,14 +108,36 @@ def _concat(pieces: list, sample_rate: int, gap_seconds: float):
 
 # --------------------------------------------------------------------- IndicF5
 
+INDICF5_UNAVAILABLE = (
+    "IndicF5 does not currently load on this stack. Its bundled remote code targets an "
+    "older f5-tts and an older transformers: on transformers 5.x it dies constructing "
+    "the model on a meta device, and pinning transformers to 4.46.1 exposes a "
+    "load_model() signature mismatch against every published f5-tts release. Its "
+    "dependencies also conflict directly with parler-tts, so the two cannot share an "
+    "environment.\n\n"
+    "Use 'tts-indic-parler' instead — it is verified working and covers Tamil. For a "
+    "stable narrator, put a named speaker in the voice description; see service/API.md."
+)
+
+
 def _indicf5():
+    """Load IndicF5. Currently raises: see INDICF5_UNAVAILABLE.
+
+    Kept registered rather than deleted because the model is the better fit for this
+    project — true voice cloning from a reference clip — and only its packaging is
+    broken. When upstream ships remote code matching a current f5-tts, this becomes a
+    working path again with no API change.
+    """
     if "indicf5" not in _cache:
         from transformers import AutoModel
         local = MODELS_DIR / "tts" / "IndicF5"
         source = str(local) if local.exists() else "ai4bharat/IndicF5"
-        _cache["indicf5"] = AutoModel.from_pretrained(
-            source, trust_remote_code=True
-        ).to(_device())
+        try:
+            _cache["indicf5"] = AutoModel.from_pretrained(
+                source, trust_remote_code=True
+            ).to(_device())
+        except Exception as exc:  # noqa: BLE001
+            raise RuntimeError(f"{INDICF5_UNAVAILABLE}\n\nunderlying error: {exc}") from exc
     return _cache["indicf5"]
 
 
@@ -162,25 +187,19 @@ def run_indicf5(p: dict, files: dict[str, Path],
 
 # ------------------------------------------------------------- Indic Parler-TTS
 
-def _parler():
-    if "parler" not in _cache:
-        from transformers import AutoTokenizer
-        from parler_tts import ParlerTTSForConditionalGeneration
-        local = MODELS_DIR / "tts" / "indic-parler-tts"
-        source = str(local) if local.exists() else "ai4bharat/indic-parler-tts"
-        model = ParlerTTSForConditionalGeneration.from_pretrained(source).to(_device())
-        _cache["parler"] = (
-            model,
-            AutoTokenizer.from_pretrained(source),
-            AutoTokenizer.from_pretrained(model.config.text_encoder._name_or_path),
-        )
-    return _cache["parler"]
+# parler-tts pins transformers==4.46.1 while ComfyUI needs >=4.50.3, so it lives in its
+# own virtualenv and runs as a subprocess. Installing it into the shared environment
+# downgrades transformers and puts the image engine at risk.
+PARLER_VENV = ROOT / ".venv-parler" / "bin" / "python"
+PARLER_WORKER = Path(__file__).resolve().parent / "parler_worker.py"
+
+
+def parler_available() -> bool:
+    return PARLER_VENV.exists() and PARLER_WORKER.exists()
 
 
 def run_parler(p: dict, files: dict[str, Path],
                progress: Callable[[float, str], None]) -> list[Path]:
-    import torch
-
     description = p.get("voice_description") or ""
     if p.get("voice"):
         description = voices.resolve(p["voice"], "indic-parler")["voice_description"]
@@ -194,33 +213,69 @@ def run_parler(p: dict, files: dict[str, Path],
     if not chunks:
         raise ValueError("'text' is empty")
 
-    progress(0.05, "loading Indic Parler-TTS")
-    model, tokenizer, description_tokenizer = _parler()
-    device = _device()
+    if not parler_available():
+        raise RuntimeError(
+            "Indic Parler-TTS is not installed. It needs its own virtualenv because it "
+            "pins transformers 4.46.1, which would break ComfyUI. Create it with:\n"
+            "  python3.13 -m venv .venv-parler\n"
+            "  .venv-parler/bin/pip install torch --index-url "
+            "https://download.pytorch.org/whl/cu130\n"
+            "  .venv-parler/bin/pip install "
+            "git+https://github.com/huggingface/parler-tts.git soundfile"
+        )
 
-    # Encode the description once: identical conditioning for every chunk is what keeps
-    # the narrator stable across a long passage.
-    desc = description_tokenizer(description, return_tensors="pt").to(device)
+    model_dir = MODELS_DIR / "tts" / "indic-parler-tts"
+    if not model_dir.exists():
+        raise RuntimeError(
+            f"missing {model_dir}. Fetch it with ./scripts/fetch-tts indic-parler"
+        )
 
-    pieces = []
-    for index, chunk in enumerate(chunks):
-        progress(0.1 + 0.85 * index / len(chunks),
-                 f"synthesising {index + 1}/{len(chunks)}")
-        prompt = tokenizer(chunk, return_tensors="pt").to(device)
-        with torch.no_grad():
-            generation = model.generate(
-                input_ids=desc.input_ids,
-                attention_mask=desc.attention_mask,
-                prompt_input_ids=prompt.input_ids,
-                prompt_attention_mask=prompt.attention_mask,
-            )
-        pieces.append(generation.cpu().numpy().squeeze())
-
-    sample_rate = model.config.sampling_rate
-    audio = _concat(pieces, sample_rate, p["gap_seconds"])
     out = OUTPUT_DIR / "audio" / f"{p['job_id']}.wav"
-    seconds = _write_wav(out, audio, sample_rate)
-    progress(1.0, f"done — {seconds:.1f}s in {len(chunks)} chunk(s)")
+    out.parent.mkdir(parents=True, exist_ok=True)
+
+    request = {
+        "model_dir": str(model_dir),
+        "description": description,
+        "chunks": chunks,
+        "output": str(out),
+        "gap_seconds": p["gap_seconds"],
+    }
+
+    progress(0.05, "starting Indic Parler-TTS")
+    process = subprocess.Popen(
+        [str(PARLER_VENV), str(PARLER_WORKER)],
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        text=True,
+    )
+    process.stdin.write(json.dumps(request))
+    process.stdin.close()
+
+    # Relay the worker's progress lines while it runs.
+    stderr_tail: list[str] = []
+    for line in process.stderr:
+        line = line.rstrip()
+        if line.startswith("PROGRESS "):
+            _, fraction, stage = line.split(" ", 2)
+            progress(float(fraction), stage)
+        else:
+            stderr_tail.append(line)
+            del stderr_tail[:-20]
+
+    stdout = process.stdout.read()
+    process.wait()
+
+    try:
+        result = json.loads(stdout)
+    except json.JSONDecodeError:
+        raise RuntimeError(
+            "Indic Parler-TTS worker produced no result. "
+            + (" / ".join(stderr_tail[-5:]) or f"exit {process.returncode}")
+        ) from None
+
+    if not result.get("ok"):
+        raise RuntimeError(result.get("error", "Indic Parler-TTS failed"))
+
+    progress(1.0, f"done — {result['seconds']:.1f}s in {result['chunks']} chunk(s)")
     return [out]
 
 

@@ -58,6 +58,27 @@ Adding a capability means adding a module under `pipelines/` and importing it in
 | Thumbnail | `service/data/thumbs/<job-id>.jpg` |
 | History | `service/data/app.db` |
 
+## Two virtualenvs, on purpose
+
+| venv | holds | why |
+|---|---|---|
+| `.venv` | ComfyUI, torch, FastAPI, whisper | the main environment |
+| `.venv-parler` | parler-tts, its own torch | parler-tts pins `transformers==4.46.1`; ComfyUI needs `>=4.50.3` |
+
+Installing parler-tts into the main environment silently downgrades transformers and
+puts the image engine at risk. It runs as a subprocess instead
+(`pipelines/parler_worker.py`), talking JSON over stdin/stdout. Any future model with
+hard version pins should follow the same pattern rather than negotiating with the shared
+environment.
+
+Rebuild the TTS venv with:
+
+```bash
+python3.13 -m venv .venv-parler
+.venv-parler/bin/pip install torch --index-url https://download.pytorch.org/whl/cu130
+.venv-parler/bin/pip install git+https://github.com/huggingface/parler-tts.git soundfile
+```
+
 ## Deleting a generation completely
 
 One generation leaves data in seven places, two of them non-obvious: the **mp4 embeds
