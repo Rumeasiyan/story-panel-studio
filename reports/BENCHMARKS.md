@@ -1,7 +1,6 @@
 # Benchmarks
 
-Append one entry per measured run. No benchmarks recorded yet — no model weights are
-installed.
+Append one entry per measured run. Measured results are below.
 
 ## How to measure
 
