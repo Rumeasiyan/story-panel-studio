@@ -1,14 +1,17 @@
 'use strict';
 
+// A thin client over the same REST API an external orchestrator uses. The form is built
+// from each pipeline's declared parameters, so adding a capability server-side needs no
+// change here.
+
 const $ = (id) => document.getElementById(id);
 
-let OPTIONS = null;
+let PIPELINES = [];
 let JOBS = [];
 let openJobId = null;
-let pickedFile = null;
-let GPU = null;          // whatever card this instance is actually talking to
+const fileInputs = new Map();   // param name -> <input type=file>
 
-// ------------------------------------------------------------------ helpers
+// ------------------------------------------------------------------- helpers
 
 async function api(path, init) {
   const response = await fetch(path, init);
@@ -23,12 +26,14 @@ async function api(path, init) {
   return response.status === 204 ? null : response.json();
 }
 
-const pad = (n) => String(n).padStart(2, '0');
+const escapeHtml = (text) => String(text ?? '').replace(/[&<>"']/g, (c) => (
+  { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+));
 
 function duration(seconds) {
   if (seconds == null) return '—';
   const s = Math.round(seconds);
-  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${pad(s % 60)}s`;
+  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`;
 }
 
 function ago(epoch) {
@@ -39,156 +44,89 @@ function ago(epoch) {
   return new Date(epoch * 1000).toLocaleDateString();
 }
 
-function escapeHtml(text) {
-  return String(text ?? '').replace(/[&<>"']/g, (c) => (
-    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
-  ));
-}
+const currentPipeline = () => PIPELINES.find((p) => p.id === $('pipeline').value);
 
-// ------------------------------------------------------------------- setup
+// --------------------------------------------------------------- form build
 
-async function loadOptions() {
-  OPTIONS = await api('/api/options');
-
-  const preset = $('preset');
-  preset.innerHTML = OPTIONS.presets
-    .map((p) => `<option value="${p.id}">${p.width}×${p.height}</option>`).join('')
-    + '<option value="custom">Custom…</option>';
-  preset.value = OPTIONS.defaults.preset;
-
-  const frames = $('frames');
-  renderLengthOptions(OPTIONS.defaults.fps);
-  frames.value = OPTIONS.defaults.frames;
-
-  const limits = OPTIONS.limits;
-  $('width').min = limits.min_dim;
-  $('width').max = limits.max_dim;
-  $('width').step = limits.dim_step;
-  $('height').min = limits.min_dim;
-  $('height').max = limits.max_dim;
-  $('height').step = limits.dim_step;
-  $('secondsCustom').max = limits.max_frames / 24;
-
-  $('sampler').innerHTML = OPTIONS.samplers.map((s) => `<option>${s}</option>`).join('');
-  $('scheduler').innerHTML = OPTIONS.schedulers.map((s) => `<option>${s}</option>`).join('');
-
-  $('steps').value = OPTIONS.defaults.steps;
-  $('cfg').value = OPTIONS.defaults.cfg;
-  $('fps').value = OPTIONS.defaults.fps;
-  $('shift').value = OPTIONS.defaults.shift;
-  $('sampler').value = OPTIONS.defaults.sampler;
-  $('scheduler').value = OPTIONS.defaults.scheduler;
-  $('negative').value = OPTIONS.default_negative;
-
-  // The two fps inputs (Advanced and the Length row) mirror each other.
-  $('fps2').addEventListener('input', () => { $('fps').value = $('fps2').value; updateNotes(); });
-  $('fps').addEventListener('input', () => { $('fps2').value = $('fps').value; });
-
-  ['preset', 'frames', 'fps', 'width', 'height', 'secondsCustom', 'fps2']
-    .forEach((id) => {
-      $(id).addEventListener('change', updateNotes);
-      $(id).addEventListener('input', updateNotes);
-    });
-  updateNotes();
-}
-
-// Current width/height/frames, whichever source the form is using.
-function chosenSize() {
-  const presetId = $('preset').value;
-  if (presetId === 'custom') {
-    return { width: Number($('width').value) || 0, height: Number($('height').value) || 0 };
+function fieldControl(param) {
+  const id = `p_${param.name}`;
+  if (param.type === 'enum') {
+    const options = (param.choices || [])
+      .map((c) => `<option value="${escapeHtml(c)}"${c === param.default ? ' selected' : ''}>${escapeHtml(c)}</option>`)
+      .join('');
+    return `<select id="${id}">${options}</select>`;
   }
-  const preset = OPTIONS.presets.find((p) => p.id === presetId);
-  return { width: preset ? preset.width : 0, height: preset ? preset.height : 0 };
-}
-
-let lastLabelledFps = null;
-
-function renderLengthOptions(fps) {
-  // Rebuilding the <select> steals focus and closes it mid-interaction, so only do it
-  // when the labels would actually change.
-  if (fps === lastLabelledFps) return;
-  lastLabelledFps = fps;
-  const select = $('frames');
-  const keep = select.value;
-  select.innerHTML = OPTIONS.frames
-    .map((f) => `<option value="${f}">${(f / fps).toFixed(1)}s · ${f} frames</option>`)
-    .join('') + '<option value="custom">Custom…</option>';
-  if (keep) select.value = keep;
-}
-
-function chosenFrames() {
-  const fps = Number($('fps').value) || 24;
-  const raw = $('frames').value === 'custom'
-    ? Math.round((Number($('secondsCustom').value) || 0) * fps)
-    : Number($('frames').value);
-  // Wan needs length = 4n + 1; show what the server will actually use.
-  const step = OPTIONS.limits.frame_step;
-  return raw - ((raw - 1) % step);
-}
-
-const snap = (value) => {
-  const { min_dim: lo, max_dim: hi, dim_step: step } = OPTIONS.limits;
-  return Math.max(lo, Math.min(hi, Math.round(value / step) * step));
-};
-
-function updateNotes() {
-  const isCustomSize = $('preset').value === 'custom';
-  const isCustomFrames = $('frames').value === 'custom';
-  $('customSize').hidden = !isCustomSize;
-  $('customFrames').hidden = !isCustomFrames;
-
-  const fps = Number($('fps').value) || 24;
-  renderLengthOptions(fps);
-  const { width, height } = chosenSize();
-  const frames = Math.max(OPTIONS.limits.min_frames, chosenFrames());
-  const limits = OPTIONS.limits;
-
-  const pixelFrames = width * height * frames;
-  const seconds = frames / fps;
-
-  // The reference point is a setting known comfortable on an 8 GiB card. Rescale it
-  // for whatever GPU is actually attached, so this stays meaningful on other machines.
-  const vram = GPU && GPU.vram_total ? GPU.vram_total / 1024 ** 3 : null;
-  const scale = vram ? vram / limits.baseline_vram_gib : 1;
-  const budget = limits.baseline_cost * scale;
-  const cost = pixelFrames / budget;
-
-  $('costLabel').textContent =
-    `${width}×${height} · ${frames} frames · ${seconds.toFixed(1)}s @ ${fps}fps`;
-  $('costFactor').textContent =
-    `${(pixelFrames / 1e6).toFixed(1)} MP·frames · ${cost.toFixed(1)}× reference`;
-
-  const fill = Math.min(100, (cost / 4) * 100);
-  const bar = $('costFill');
-  bar.style.width = `${fill}%`;
-  bar.className = cost <= 1.2 ? 'ok' : cost <= 2.5 ? 'warn' : 'bad';
-
-  const card = vram
-    ? `${GPU.name.replace(/^cuda:\d+\s*/, '')} (${vram.toFixed(1)} GiB)`
-    : 'the current GPU';
-
-  // Wan 2.2 TI2V-5B was trained on clips of up to 121 frames (5s at 24fps). Past
-  // that it still runs, but coherence drifts — worth saying before the render, not after.
-  const beyondTraining = frames > 121
-    ? ` Note: ${frames} frames is past the ${'121'}-frame (5s @ 24fps) length Wan 2.2 was `
-      + 'trained on — expect drift or looping.'
-    : '';
-
-  let note;
-  if (isCustomSize && (snap(width) !== width || snap(height) !== height)) {
-    note = `Will be rounded to ${snap(width)}×${snap(height)} — Wan needs `
-         + `multiples of ${limits.dim_step}.`;
-  } else if (cost <= 1.2) {
-    note = `Comfortable for ${card}.`;
-  } else if (cost <= 2.5) {
-    note = `Heavier than the reference for ${card} — expect more offloading and a `
-         + 'longer render.';
-  } else {
-    note = `Well beyond the reference for ${card}. It will be slow and may run out of `
-         + 'memory — nothing stops you trying.';
+  if (param.type === 'bool') {
+    return `<input id="${id}" type="checkbox"${param.default ? ' checked' : ''}>`;
   }
-  $('costNote').textContent = note + beyondTraining;
+  if (param.type === 'int' || param.type === 'float') {
+    const step = param.type === 'int' ? '1' : 'any';
+    const min = param.min != null ? ` min="${param.min}"` : '';
+    const max = param.max != null ? ` max="${param.max}"` : '';
+    const value = param.default != null ? ` value="${param.default}"` : '';
+    return `<input id="${id}" type="number" step="${step}"${min}${max}${value}>`;
+  }
+  // Long free text gets a textarea; short strings a single line.
+  const long = ['prompt', 'negative', 'text', 'script', 'voice_description',
+                'reference_text'].includes(param.name);
+  if (long) {
+    const rows = param.name === 'negative' ? 2 : 4;
+    return `<textarea id="${id}" rows="${rows}">${escapeHtml(param.default ?? '')}</textarea>`;
+  }
+  const placeholder = param.name === 'seed' ? 'blank = random' : '';
+  return `<input id="${id}" type="text" value="${escapeHtml(param.default ?? '')}" placeholder="${placeholder}">`;
+}
+
+function renderFields() {
+  const pipeline = currentPipeline();
+  const host = $('fields');
+  fileInputs.clear();
+  if (!pipeline) { host.innerHTML = ''; return; }
+
+  $('pipelineNote').textContent = pipeline.description || '';
+
+  const parts = [];
+  for (const key of pipeline.accepts_files || []) {
+    const accept = key.includes('audio') ? 'audio/*' : 'image/*';
+    parts.push(`
+      <label class="field">
+        <span>${key} <em class="hint">(file)</em></span>
+        <input type="file" id="f_${key}" accept="${accept}">
+      </label>`);
+  }
+  for (const param of pipeline.params) {
+    const req = param.required ? ' <em class="req">required</em>' : '';
+    parts.push(`
+      <label class="field">
+        <span>${param.name}${req}</span>
+        ${fieldControl(param)}
+        ${param.help ? `<small class="hint">${escapeHtml(param.help)}</small>` : ''}
+      </label>`);
+  }
+  host.innerHTML = parts.join('');
+
+  for (const key of pipeline.accepts_files || []) {
+    fileInputs.set(key, $(`f_${key}`));
+  }
+}
+
+function collectForm() {
+  const pipeline = currentPipeline();
+  const form = new FormData();
+  form.set('pipeline', pipeline.id);
+
+  for (const param of pipeline.params) {
+    const element = $(`p_${param.name}`);
+    if (!element) continue;
+    const value = param.type === 'bool'
+      ? (element.checked ? 'true' : 'false')
+      : element.value;
+    if (value !== '' && value != null) form.set(param.name, value);
+  }
+  for (const [key, input] of fileInputs) {
+    if (input?.files?.[0]) form.set(key, input.files[0], input.files[0].name);
+  }
+  return form;
 }
 
 // ------------------------------------------------------------------ status
@@ -197,79 +135,22 @@ async function refreshStatus() {
   try {
     const status = await api('/api/status');
     const dot = $('statusDot');
-    const text = $('statusText');
     if (!status.comfy_up) {
       dot.className = 'dot down';
-      text.textContent = 'ComfyUI offline — run ./scripts/comfy.sh wan';
+      $('statusText').textContent = 'ComfyUI offline — image/video jobs will fail';
       return;
     }
-    GPU = status.gpu || null;
     dot.className = status.current ? 'dot busy' : 'dot up';
     const bits = [`ComfyUI ${status.comfy_version || 'up'}`];
     if (status.gpu && status.gpu.vram_free != null) {
-      bits.push(`${(status.gpu.vram_free / 1024 ** 3).toFixed(1)} GiB VRAM free`);
+      bits.push(`${(status.gpu.vram_free / 1024 ** 3).toFixed(1)} GiB free`);
     }
     if (status.queued) bits.push(`${status.queued} queued`);
-    text.textContent = bits.join(' · ');
-    updateNotes();   // cost guidance depends on the detected GPU
+    $('statusText').textContent = bits.join(' · ');
   } catch {
     $('statusDot').className = 'dot down';
     $('statusText').textContent = 'service unreachable';
   }
-}
-
-// ------------------------------------------------------------------- image
-
-function setImage(file) {
-  pickedFile = file || null;
-  const preview = $('imagePreview');
-  const empty = $('dzEmpty');
-  const clear = $('clearImage');
-  if (!pickedFile) {
-    preview.hidden = true;
-    preview.removeAttribute('src');
-    empty.hidden = false;
-    clear.hidden = true;
-    return;
-  }
-  preview.src = URL.createObjectURL(pickedFile);
-  preview.hidden = false;
-  empty.hidden = true;
-  clear.hidden = false;
-}
-
-function wireDropzone() {
-  const zone = $('dropzone');
-  const input = $('imageInput');
-
-  zone.addEventListener('click', (event) => {
-    if (event.target.id !== 'clearImage') input.click();
-  });
-  zone.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); input.click(); }
-  });
-  input.addEventListener('change', () => setImage(input.files[0]));
-
-  ['dragenter', 'dragover'].forEach((type) =>
-    zone.addEventListener(type, (event) => {
-      event.preventDefault();
-      zone.classList.add('over');
-    }));
-  ['dragleave', 'drop'].forEach((type) =>
-    zone.addEventListener(type, (event) => {
-      event.preventDefault();
-      zone.classList.remove('over');
-    }));
-  zone.addEventListener('drop', (event) => {
-    const file = event.dataTransfer.files[0];
-    if (file && file.type.startsWith('image/')) setImage(file);
-  });
-
-  $('clearImage').addEventListener('click', (event) => {
-    event.stopPropagation();
-    input.value = '';
-    setImage(null);
-  });
 }
 
 // ---------------------------------------------------------------- generate
@@ -278,65 +159,38 @@ async function generate() {
   const button = $('generate');
   const error = $('formError');
   error.hidden = true;
-
-  const prompt = $('prompt').value.trim();
-  if (!prompt) {
-    error.textContent = 'Write a prompt first.';
-    error.hidden = false;
-    return;
-  }
-
-  const form = new FormData();
-  form.set('prompt', prompt);
-  form.set('negative', $('negative').value);
-  form.set('preset', $('preset').value);
-  if ($('preset').value === 'custom') {
-    form.set('width', $('width').value);
-    form.set('height', $('height').value);
-  }
-  form.set('frames', String(chosenFrames()));
-  form.set('steps', $('steps').value);
-  form.set('cfg', $('cfg').value);
-  form.set('fps', $('fps').value);
-  form.set('shift', $('shift').value);
-  form.set('sampler', $('sampler').value);
-  form.set('scheduler', $('scheduler').value);
-  form.set('seed', $('seed').value);
-  if (pickedFile) form.set('image', pickedFile, pickedFile.name);
-
   button.disabled = true;
   button.textContent = 'Queueing…';
   try {
-    await api('/api/generate', { method: 'POST', body: form });
+    await api('/api/generate', { method: 'POST', body: collectForm() });
     await refreshJobs();
   } catch (exc) {
     error.textContent = exc.message;
     error.hidden = false;
   } finally {
     button.disabled = false;
-    button.textContent = 'Generate video';
+    button.textContent = 'Queue job';
   }
 }
 
-// ------------------------------------------------------------------- jobs
+// -------------------------------------------------------------------- jobs
 
 async function refreshJobs() {
+  const kind = $('kindFilter').value;
   let payload;
   try {
-    payload = await api('/api/jobs?limit=300');
-  } catch {
-    return;
-  }
+    payload = await api(`/api/jobs?limit=300${kind ? `&kind=${kind}` : ''}`);
+  } catch { return; }
   JOBS = payload.jobs;
   $('jobCount').textContent = payload.total ? `(${payload.total})` : '';
   renderActive();
   renderGrid();
-  if (openJobId) refreshModal();
+  if (openJobId) renderModal();
 }
 
 function renderActive() {
-  const host = $('active');
   const live = JOBS.filter((j) => j.status === 'running' || j.status === 'queued');
+  const host = $('active');
   if (!live.length) { host.innerHTML = ''; return; }
 
   host.innerHTML = live.map((job) => {
@@ -344,21 +198,17 @@ function renderActive() {
     const percent = Math.round((job.progress || 0) * 100);
     const elapsed = running && job.started_at
       ? duration(Date.now() / 1000 - job.started_at) : '';
-    const where = running
-      ? `${percent}% · ${job.steps} steps`
-      : (job.queue_position ? `queued · position ${job.queue_position}` : 'queued');
     return `
       <div class="active-card">
         <div class="active-head">
-          <strong>${running ? 'Rendering' : 'Waiting'}</strong>
+          <strong>${running ? 'Running' : 'Queued'} · ${escapeHtml(job.pipeline)}</strong>
           <button data-cancel="${job.id}">Cancel</button>
         </div>
         <div class="bar"><i style="width:${running ? percent : 0}%"></i></div>
         <div class="active-meta">
-          <span>${where}</span>
-          <span>${job.width}×${job.height} · ${job.frames}f${elapsed ? ' · ' + elapsed : ''}</span>
+          <span>${escapeHtml(job.stage || job.status)}${running ? ` · ${percent}%` : ''}</span>
+          <span>${elapsed}</span>
         </div>
-        <p class="active-prompt">${escapeHtml(job.prompt.slice(0, 160))}</p>
       </div>`;
   }).join('');
 
@@ -366,33 +216,35 @@ function renderActive() {
     button.addEventListener('click', async () => {
       button.disabled = true;
       try { await api(`/api/jobs/${button.dataset.cancel}/cancel`, { method: 'POST' }); }
-      catch { /* it probably finished on its own */ }
+      catch { /* it likely finished already */ }
       refreshJobs();
     });
   });
 }
 
-function renderGrid() {
-  const onlyDone = $('onlyDone').checked;
-  const items = JOBS.filter((j) => (onlyDone ? j.status === 'done' : true));
-  const grid = $('grid');
-  $('empty').hidden = items.length > 0;
+const summarise = (job) => {
+  const p = job.params || {};
+  return p.prompt || p.text || p.script || '(no text)';
+};
 
-  grid.innerHTML = items.map((job) => {
-    const thumb = job.has_thumb
+function renderGrid() {
+  const grid = $('grid');
+  $('empty').hidden = JOBS.length > 0;
+
+  grid.innerHTML = JOBS.map((job) => {
+    const thumb = job.thumb
       ? `style="background-image:url('/api/jobs/${job.id}/thumb')"` : '';
-    const placeholder = job.has_thumb ? '' : ({
-      running: 'rendering…', queued: 'queued', error: 'failed', cancelled: 'cancelled',
-    }[job.status] || 'no preview');
+    const placeholder = job.thumb ? '' : ({
+      running: 'running…', queued: 'queued', error: 'failed', cancelled: 'cancelled',
+    }[job.status] || job.kind);
     return `
       <article class="card" data-open="${job.id}">
         <div class="thumb" ${thumb}>${placeholder}</div>
         <div class="body">
-          <div class="line1">${escapeHtml(job.prompt.slice(0, 110))}</div>
+          <div class="line1">${escapeHtml(summarise(job).slice(0, 110))}</div>
           <div class="line2">
             <span class="badge ${job.status}">${job.status}</span>
-            <span>${job.width}×${job.height}</span>
-            <span>${job.frames}f</span>
+            <span>${escapeHtml(job.kind)}</span>
             <span>${ago(job.created_at)}</span>
           </div>
         </div>
@@ -404,113 +256,93 @@ function renderGrid() {
   });
 }
 
-// ------------------------------------------------------------------ modal
+// ------------------------------------------------------------------ viewer
 
-function jobById(id) { return JOBS.find((j) => j.id === id); }
+const jobById = (id) => JOBS.find((j) => j.id === id);
 
 function openModal(id) {
-  const job = jobById(id);
-  if (!job) return;
+  if (!jobById(id)) return;
   openJobId = id;
   $('modal').hidden = false;
   document.body.style.overflow = 'hidden';
-  refreshModal(true);
+  renderModal(true);
 }
 
 function closeModal() {
   openJobId = null;
-  const player = $('player');
-  player.pause();
-  player.removeAttribute('src');
-  player.load();
+  $('viewer').innerHTML = '';
   $('modal').hidden = true;
   document.body.style.overflow = '';
 }
 
-function refreshModal(reload = false) {
+function viewerFor(job) {
+  if (!job.outputs || !job.outputs.length) return '<p class="empty">No output yet.</p>';
+  const url = `/api/jobs/${job.id}/output?index=0`;
+  if (job.kind === 'video') {
+    return `<video id="player" controls playsinline preload="metadata" src="${url}"></video>`;
+  }
+  if (job.kind === 'image') {
+    return job.outputs.map((_, i) =>
+      `<img class="viewer-image" src="/api/jobs/${job.id}/output?index=${i}" alt="">`).join('');
+  }
+  if (job.kind === 'audio') {
+    return `<audio id="player" controls src="${url}" style="width:100%"></audio>`;
+  }
+  return '<pre class="subs" id="subsBox">loading…</pre>';
+}
+
+function renderModal(reload = false) {
   const job = jobById(openJobId);
   if (!job) { closeModal(); return; }
 
-  const player = $('player');
-  const source = job.has_video ? `/api/jobs/${job.id}/video` : '';
-  if (reload || (source && !player.src.endsWith(source))) {
-    if (source) { player.src = source; } else { player.removeAttribute('src'); player.load(); }
+  if (reload) {
+    $('viewer').innerHTML = viewerFor(job);
+    if (job.kind === 'subtitle' && job.outputs && job.outputs.length) {
+      fetch(`/api/jobs/${job.id}/output?index=0`).then((r) => r.text())
+        .then((t) => { const box = $('subsBox'); if (box) box.textContent = t; });
+    }
   }
 
+  const has = Boolean(job.outputs && job.outputs.length);
   const download = $('btnDownload');
-  download.href = `/api/jobs/${job.id}/download`;
-  download.style.display = job.has_video ? '' : 'none';
-  $('btnFullscreen').style.display = job.has_video ? '' : 'none';
+  download.href = `/api/jobs/${job.id}/output?index=0&download=true`;
+  download.style.display = has ? '' : 'none';
+  $('btnFullscreen').style.display = job.kind === 'video' && has ? '' : 'none';
 
   const rows = [
-    ['status', job.status],
-    ['size', `${job.width}×${job.height}`],
-    ['frames', `${job.frames} (${(job.frames / job.fps).toFixed(1)}s @ ${job.fps}fps)`],
-    ['steps', job.steps],
-    ['cfg', job.cfg],
-    ['sampler', `${job.sampler} / ${job.scheduler}`],
-    ['shift', job.shift],
-    ['seed', job.seed],
-    ['mode', job.mode === 'image' ? 'image-to-video' : 'text-to-video'],
-    ['render time', duration(job.duration)],
+    ['pipeline', job.pipeline], ['kind', job.kind], ['status', job.status],
+    ['outputs', (job.outputs || []).length], ['took', duration(job.duration)],
     ['created', new Date(job.created_at * 1000).toLocaleString()],
   ];
   if (job.error) rows.push(['error', job.error]);
-
-  $('modalParams').innerHTML = rows.map(([key, value]) =>
-    `<div><dt>${key}</dt><dd>${escapeHtml(value)}</dd></div>`).join('');
-  $('modalPrompt').textContent = job.prompt;
+  $('modalParams').innerHTML = rows.map(([k, v]) =>
+    `<div><dt>${k}</dt><dd>${escapeHtml(v)}</dd></div>`).join('');
+  $('modalPrompt').textContent = JSON.stringify(job.params, null, 2);
 }
 
 function wireModal() {
-  document.querySelectorAll('[data-close]').forEach((element) =>
-    element.addEventListener('click', closeModal));
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && !$('modal').hidden) closeModal();
+  document.querySelectorAll('[data-close]').forEach((el) =>
+    el.addEventListener('click', closeModal));
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !$('modal').hidden) closeModal();
   });
 
   $('btnFullscreen').addEventListener('click', () => {
     const player = $('player');
-    if (player.requestFullscreen) player.requestFullscreen();
-    else if (player.webkitEnterFullscreen) player.webkitEnterFullscreen();
-  });
-
-  $('btnCopyPrompt').addEventListener('click', async () => {
-    const job = jobById(openJobId);
-    if (!job) return;
-    await navigator.clipboard.writeText(job.prompt);
-    $('btnCopyPrompt').textContent = '✓ Copied';
-    setTimeout(() => ($('btnCopyPrompt').textContent = '⧉ Copy prompt'), 1200);
+    if (player && player.requestFullscreen) player.requestFullscreen();
   });
 
   $('btnReuse').addEventListener('click', () => {
     const job = jobById(openJobId);
     if (!job) return;
-    $('prompt').value = job.prompt;
-    $('negative').value = job.negative;
-    if (OPTIONS.frames.includes(job.frames)) {
-      $('frames').value = job.frames;
-    } else {
-      $('frames').value = 'custom';
-      $('secondsCustom').value = (job.frames / job.fps).toFixed(2);
+    $('pipeline').value = job.pipeline;
+    renderFields();
+    for (const [key, value] of Object.entries(job.params || {})) {
+      const element = $(`p_${key}`);
+      if (!element) continue;
+      if (element.type === 'checkbox') element.checked = Boolean(value);
+      else if (value != null) element.value = value;
     }
-    $('fps2').value = job.fps;
-    $('steps').value = job.steps;
-    $('cfg').value = job.cfg;
-    $('fps').value = job.fps;
-    $('shift').value = job.shift;
-    $('sampler').value = job.sampler;
-    $('scheduler').value = job.scheduler;
-    $('seed').value = job.seed;
-    const preset = OPTIONS.presets.find((p) => p.width === job.width && p.height === job.height);
-    if (preset) {
-      $('preset').value = preset.id;
-    } else {
-      $('preset').value = 'custom';
-      $('width').value = job.width;
-      $('height').value = job.height;
-    }
-    updateNotes();
     closeModal();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
@@ -518,32 +350,32 @@ function wireModal() {
   $('btnDelete').addEventListener('click', async () => {
     const job = jobById(openJobId);
     if (!job) return;
-    if (!confirm('Delete this generation and its video file? This cannot be undone.')) return;
+    if (!confirm('Delete this job and its files? This cannot be undone.')) return;
     try {
       await api(`/api/jobs/${job.id}`, { method: 'DELETE' });
       closeModal();
       refreshJobs();
-    } catch (exc) {
-      alert(exc.message);
-    }
+    } catch (exc) { alert(exc.message); }
   });
 }
 
 // -------------------------------------------------------------------- boot
 
 (async function main() {
-  wireDropzone();
   wireModal();
   $('generate').addEventListener('click', generate);
-  $('onlyDone').addEventListener('change', renderGrid);
-  $('prompt').addEventListener('keydown', (event) => {
-    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') generate();
-  });
+  $('kindFilter').addEventListener('change', refreshJobs);
+  $('pipeline').addEventListener('change', renderFields);
 
-  await loadOptions();
+  const payload = await api('/api/pipelines');
+  PIPELINES = payload.pipelines;
+  $('pipeline').innerHTML = PIPELINES
+    .map((p) => `<option value="${p.id}">${p.kind} — ${escapeHtml(p.title)}</option>`)
+    .join('');
+  renderFields();
+
   await refreshStatus();
   await refreshJobs();
-
   setInterval(refreshStatus, 3000);
   setInterval(refreshJobs, 1500);
 })();

@@ -232,3 +232,18 @@ button:hover, .button:hover { border-color: #3a465c; }
 .cost-bar > i.ok { background: var(--ok); }
 .cost-bar > i.warn { background: var(--warn); }
 .cost-bar > i.bad { background: var(--err); }
+
+/* ------------------------------------------------- generic pipeline console */
+.req { color: var(--warn); font-style: normal; font-size: 10.5px; }
+#fields { display: flex; flex-direction: column; gap: 12px; }
+#fields .field > span { display: flex; gap: 6px; align-items: baseline; }
+input[type="file"] { padding: 7px; font-size: 12.5px; }
+.viewer-image { width: 100%; display: block; }
+.subs {
+  margin: 0; padding: 14px; max-height: 60vh; overflow: auto;
+  background: #0b0e14; color: var(--text); font-size: 12.5px;
+  white-space: pre-wrap; border-radius: 10px;
+}
+.player-wrap { max-height: 70vh; overflow: auto; }
+.sub a { color: var(--accent); }
+.library-head select { padding: 5px 8px; font-size: 12px; }

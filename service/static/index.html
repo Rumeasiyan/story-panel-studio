@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ai-video-gen — Wan 2.2</title>
+  <title>ai-video-gen — generation console</title>
   <link rel="stylesheet" href="/style.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🎬</text></svg>">
 </head>
@@ -14,10 +14,10 @@
     <span class="logo">🎬</span>
     <div>
       <h1>ai-video-gen</h1>
-      <p class="sub">Wan 2.2 TI2V-5B &middot; local &middot; RTX 3050</p>
+      <p class="sub">generation console &middot; local &middot; <a href="/docs">API docs</a></p>
     </div>
   </div>
-  <div id="status" class="status">
+  <div class="status">
     <span class="dot" id="statusDot"></span>
     <span id="statusText">checking…</span>
   </div>
@@ -26,91 +26,35 @@
 <main>
   <!-- ------------------------------------------------------------ compose -->
   <section class="panel compose">
-    <h2>Create</h2>
-
-    <div id="dropzone" class="dropzone" tabindex="0">
-      <input type="file" id="imageInput" accept="image/*" hidden>
-      <img id="imagePreview" alt="" hidden>
-      <div class="dz-empty" id="dzEmpty">
-        <span class="dz-icon">🖼️</span>
-        <p><strong>Drop a start image</strong> or click to choose</p>
-        <p class="hint">Optional — leave empty for text-to-video</p>
-      </div>
-      <button type="button" id="clearImage" class="chip-clear" hidden>remove</button>
-    </div>
+    <h2>Generate</h2>
 
     <label class="field">
-      <span>Prompt</span>
-      <textarea id="prompt" rows="5"
-        placeholder="Describe what happens and how it moves. e.g. a woman in a red coat walks slowly toward the camera, hair moving in the wind, shallow depth of field, overcast light, cinematic"></textarea>
+      <span>Capability</span>
+      <select id="pipeline"></select>
+      <small class="hint" id="pipelineNote"></small>
     </label>
 
-    <details class="field">
-      <summary>Negative prompt</summary>
-      <textarea id="negative" rows="3"></textarea>
-    </details>
+    <!-- Built from the selected pipeline's declared parameters. -->
+    <div id="fields"></div>
 
-    <div class="grid2">
-      <label class="field">
-        <span>Resolution</span>
-        <select id="preset"></select>
-      </label>
-      <label class="field">
-        <span>Length</span>
-        <select id="frames"></select>
-      </label>
-    </div>
-
-    <div class="grid2" id="customSize" hidden>
-      <label class="field"><span>Width</span>
-        <input id="width" type="number" step="16" value="512"></label>
-      <label class="field"><span>Height</span>
-        <input id="height" type="number" step="16" value="288"></label>
-    </div>
-    <div class="grid2" id="customFrames" hidden>
-      <label class="field"><span>Seconds</span>
-        <input id="secondsCustom" type="number" step="0.5" min="0.2" value="1.7"></label>
-      <label class="field"><span>Frames per second</span>
-        <input id="fps2" type="number" min="1" max="60" value="24"></label>
-    </div>
-
-    <div class="cost">
-      <div class="cost-line">
-        <span id="costLabel">—</span>
-        <span id="costFactor" class="cost-factor"></span>
-      </div>
-      <div class="cost-bar"><i id="costFill"></i></div>
-      <small id="costNote" class="hint"></small>
-    </div>
-
-    <details class="field">
-      <summary>Advanced</summary>
-      <div class="grid2">
-        <label class="field"><span>Steps</span><input id="steps" type="number" min="1" max="60"></label>
-        <label class="field"><span>CFG</span><input id="cfg" type="number" min="0" max="20" step="0.5"></label>
-        <label class="field"><span>FPS</span><input id="fps" type="number" min="1" max="60"></label>
-        <label class="field"><span>Shift</span><input id="shift" type="number" min="0" max="20" step="0.5"></label>
-        <label class="field"><span>Sampler</span><select id="sampler"></select></label>
-        <label class="field"><span>Scheduler</span><select id="scheduler"></select></label>
-      </div>
-      <label class="field">
-        <span>Seed</span>
-        <input id="seed" type="text" inputmode="numeric" placeholder="blank = random">
-      </label>
-    </details>
-
-    <button id="generate" class="primary">Generate video</button>
+    <button id="generate" class="primary">Queue job</button>
     <p id="formError" class="error" hidden></p>
-    <p class="hint tip">First run of a session loads ~18 GB of weights, so it is slow.
-       Later runs reuse them.</p>
+    <p class="hint tip">This console is a thin client over the same REST API your other
+       app uses. Everything here is available at <a href="/docs">/docs</a>.</p>
   </section>
 
   <!-- ------------------------------------------------------------ library -->
   <section class="panel library">
     <div class="library-head">
-      <h2>History <span id="jobCount" class="count"></span></h2>
+      <h2>Jobs <span id="jobCount" class="count"></span></h2>
       <label class="toggle">
-        <input type="checkbox" id="onlyDone"> only finished
+        <select id="kindFilter">
+          <option value="">all kinds</option>
+          <option value="image">image</option>
+          <option value="video">video</option>
+          <option value="audio">audio</option>
+          <option value="subtitle">subtitle</option>
+        </select>
       </label>
     </div>
     <div id="active"></div>
@@ -124,19 +68,16 @@
   <div class="modal-backdrop" data-close></div>
   <div class="modal-body">
     <button class="modal-close" data-close aria-label="Close">✕</button>
-    <div class="player-wrap">
-      <video id="player" controls playsinline preload="metadata"></video>
-    </div>
+    <div class="player-wrap" id="viewer"></div>
     <div class="modal-meta">
       <div class="modal-actions">
         <button id="btnFullscreen">⛶ Fullscreen</button>
         <a id="btnDownload" class="button" download>⬇ Download</a>
-        <button id="btnCopyPrompt">⧉ Copy prompt</button>
         <button id="btnReuse">↻ Reuse settings</button>
         <button id="btnDelete" class="danger">🗑 Delete</button>
       </div>
       <dl id="modalParams" class="params"></dl>
-      <p class="modal-prompt" id="modalPrompt"></p>
+      <pre class="modal-prompt" id="modalPrompt"></pre>
     </div>
   </div>
 </div>

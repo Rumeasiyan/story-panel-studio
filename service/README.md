@@ -1,7 +1,13 @@
-# Local web UI
+# Generation service
 
-A single-page app for generating Wan 2.2 videos: prompt, optional start image, queue,
-live progress, and a permanent history you can replay, watch fullscreen, and download.
+A local REST API for generating story-video assets: images, image edits, narration,
+subtitles and video. It **generates only** — an external app queues jobs, polls them,
+collects the files, and does assembly, thumbnails, SEO and upload.
+
+**[API.md](API.md) is the reference for callers.** Interactive docs at `/docs`.
+
+A small web console is served at `/`, built from the same API, for eyeballing results
+and trying parameters by hand.
 
 ```bash
 ./scripts/serve.sh        # starts ComfyUI (wan mode) if needed, then the UI
@@ -31,13 +37,16 @@ through.
 
 | File | Role |
 |---|---|
-| `app.py` | FastAPI routes, input validation, range-aware video serving |
-| `jobs.py` | SQLite history + the single serialized render worker |
+| `app.py` | FastAPI routes, parameter validation, range-aware file serving |
+| `jobs.py` | SQLite history + the single serialized worker |
 | `comfy_client.py` | ComfyUI HTTP/WebSocket client, progress, error translation |
-| `workflow.py` | fills the API template with one job's parameters |
-| `config.py` | paths, presets, node ids, defaults |
-| `static/` | the page: `index.html`, `app.js`, `style.css` — no build step, no CDN |
+| `pipelines/` | one module per capability; each declares its own typed parameters |
+| `config.py` | paths and defaults |
+| `static/` | the console: `index.html`, `app.js`, `style.css` — no build step, no CDN |
 | `data/` | SQLite database, uploads, thumbnails — gitignored |
+
+Adding a capability means adding a module under `pipelines/` and importing it in
+`pipelines/__init__.py`. The API layer is generic and needs no change.
 
 ## Where files go
 
