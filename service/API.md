@@ -162,6 +162,61 @@ irreversible.
 
 ---
 
+## Voice profiles
+
+Voice consistency is the narration equivalent of character consistency: a channel needs
+ONE narrator who never drifts across hundreds of episodes. Register the voice once, then
+refer to it by name — passing a reference clip on every request means one wrong file
+changes your narrator mid-series.
+
+```http
+GET    /api/voices                 list registered voices
+POST   /api/voices                 register or replace
+GET    /api/voices/{name}          one profile
+GET    /api/voices/{name}/reference  the stored clip
+DELETE /api/voices/{name}
+```
+
+Cloned voice (IndicF5) — needs a clip and its exact transcript:
+
+```bash
+curl -X POST http://127.0.0.1:8189/api/voices \
+  -F name=narrator-en-cinematic \
+  -F engine=indicf5 -F language=en \
+  -F 'reference_text=This is the narrator voice for the channel, speaking clearly.' \
+  -F reference_audio=@narrator.wav
+```
+
+Described voice (Indic Parler) — no clip:
+
+```bash
+curl -X POST http://127.0.0.1:8189/api/voices \
+  -H 'Content-Type: application/json' \
+  -d '{"name": "narrator-tamil-anime", "engine": "indic-parler", "language": "ta",
+       "voice_description": "A calm middle-aged male narrator, measured pace, very high recording quality."}'
+```
+
+Then every episode just names it:
+
+```bash
+curl -X POST http://127.0.0.1:8189/api/generate \
+  -H 'Content-Type: application/json' \
+  -d '{"pipeline": "tts-indicf5", "voice": "narrator-en-cinematic", "text": "..."}'
+```
+
+Profiles live in `service/data/voices/` and survive restarts. Four channels means four
+profiles — one per art-style/language pair.
+
+### Long narration
+
+`text` of any length is accepted. It is split on sentence boundaries (including the
+Devanagari danda used by Indic scripts) into chunks of ~300 characters, synthesised with
+identical voice conditioning, and concatenated with `gap_seconds` of silence between
+sentences. Both models degrade on very long inputs, so this is done for you rather than
+left to the caller.
+
+---
+
 ## Notes that matter in practice
 
 **Character consistency.** Three tools, weakest to strongest:
@@ -178,17 +233,17 @@ timing, so transcription errors cannot rewrite your words. Strongly recommended 
 Tamil, where ASR is weaker. Omit `script` to transcribe instead. The `.json` output
 carries per-word timings for karaoke-style rendering.
 
-**Narration.** `tts-indicf5` clones a voice from `reference_audio` plus its exact
-`reference_text` — the right choice for one fixed narrator per channel.
-`tts-indic-parler` needs no clip; keep `voice_description` byte-identical across
-episodes or the voice drifts.
+**Narration.** Register a voice profile and pass `voice`; see above. Inline
+`reference_audio`/`voice_description` still work for one-offs and A/B tests.
 
 **Timing on an RTX 3050 8 GB**, measured:
 
 | Job | Time |
 |---|---|
-| SDXL 1024×576, 25 steps | ~24 s |
+| SDXL 1024×576, 25 steps | ~24 s (14.1 s each at `batch_size` 4) |
 | SDXL img2img, same size | ~25 s |
+| FLUX.2 klein text-to-image, 4 steps | ~18 s |
+| FLUX.2 klein instruction edit | ~21 s |
 | Subtitles, script-aligned, base model | ~4 s |
 | Wan 2.2 video 720p 5s, 20 steps | ~27 min |
 

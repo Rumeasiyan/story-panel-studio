@@ -31,6 +31,7 @@ from starlette.datastructures import UploadFile
 
 import jobs as jobstore
 import pipelines
+import voices
 from config import (
     DATA_DIR,
     MAX_UPLOAD_BYTES,
@@ -391,6 +392,97 @@ async def api_input(job_id: str, key: str = "image"):
     if not name:
         raise HTTPException(404, f"this job had no '{key}' input")
     return FileResponse(safe_path(UPLOAD_DIR, name))
+
+
+# ----------------------------------------------------------------- voices
+
+@app.get("/api/voices", summary="Registered narrator voices")
+async def api_voices():
+    return {"voices": voices.list_voices(), "engines": list(voices.ENGINES)}
+
+
+@app.post("/api/voices", summary="Register or replace a narrator voice")
+async def api_register_voice(request: Request):
+    """Register the narrator once, then pass `voice` on every TTS call.
+
+    multipart/form-data (required for indicf5, which needs a reference clip):
+        name, engine, language, reference_audio=@clip.wav, reference_text, notes
+
+    JSON (indic-parler, which needs no clip):
+        {"name": "...", "engine": "indic-parler", "voice_description": "...'"}
+    """
+    upload = None
+    content_type = request.headers.get("content-type", "")
+    if content_type.startswith("multipart/form-data"):
+        form = await request.form()
+        raw = {}
+        for key, value in form.multi_items():
+            if isinstance(value, UploadFile):
+                if key == "reference_audio":
+                    upload = value
+            else:
+                raw[key] = value
+    else:
+        try:
+            raw = await request.json()
+        except Exception:  # noqa: BLE001
+            raise HTTPException(400, "body must be JSON or multipart/form-data") from None
+
+    staged: Path | None = None
+    try:
+        if upload is not None:
+            data = await upload.read()
+            if len(data) > MAX_UPLOAD_BYTES:
+                raise HTTPException(413, "reference_audio is too large")
+            suffix = Path(upload.filename or "clip.wav").suffix.lower() or ".wav"
+            if suffix not in AUDIO_SUFFIXES:
+                raise HTTPException(
+                    400, f"reference_audio must be one of: {', '.join(sorted(AUDIO_SUFFIXES))}"
+                )
+            UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+            staged = UPLOAD_DIR / f"_voice_tmp{suffix}"
+            staged.write_bytes(data)
+
+        try:
+            profile = voices.register(
+                raw.get("name", ""),
+                raw.get("engine", "indicf5"),
+                language=raw.get("language", "ta"),
+                reference_audio=staged,
+                reference_text=raw.get("reference_text", ""),
+                voice_description=raw.get("voice_description", ""),
+                notes=raw.get("notes", ""),
+            )
+        except voices.VoiceError as exc:
+            raise HTTPException(400, str(exc)) from exc
+    finally:
+        if staged is not None:
+            staged.unlink(missing_ok=True)
+
+    return profile
+
+
+@app.get("/api/voices/{name}")
+async def api_voice(name: str):
+    profile = voices.get(name)
+    if profile is None:
+        raise HTTPException(404, f"unknown voice '{name}'")
+    return profile
+
+
+@app.get("/api/voices/{name}/reference", summary="The stored reference clip")
+async def api_voice_reference(name: str):
+    profile = voices.get(name)
+    if profile is None or not profile.get("reference_audio"):
+        raise HTTPException(404, "no reference clip for this voice")
+    return FileResponse(safe_path(voices.VOICE_DIR, profile["reference_audio"]))
+
+
+@app.delete("/api/voices/{name}")
+async def api_delete_voice(name: str):
+    if not voices.delete(name):
+        raise HTTPException(404, f"unknown voice '{name}'")
+    return {"ok": True}
 
 
 @app.get("/api/loras", summary="Character/style LoRAs available to SDXL")
