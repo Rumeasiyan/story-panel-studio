@@ -201,6 +201,7 @@ profiles:
         licence_url: https://huggingface.co/Wan-AI/Wan2.2-TI2V-5B
         commercial_review_required: false
 
+
 # Future profiles (newer anime/cinematic checkpoints, Wan 2.1, quantized variants,
 # LoRA packs, private character LoRAs, API-only providers) are added by appending
 # entries here. Nothing is downloaded until `./scripts/modelctl install <profile>`

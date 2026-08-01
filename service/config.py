@@ -13,6 +13,7 @@ THUMB_DIR = DATA_DIR / "thumbs"
 DB_PATH = DATA_DIR / "app.db"
 
 OUTPUT_DIR = ROOT / "output"
+MODELS_DIR = ROOT / "models"
 INPUT_DIR = ROOT / "input"
 
 API_WORKFLOW = ROOT / "workflows" / "api" / "wan22_ti2v_5b.json"

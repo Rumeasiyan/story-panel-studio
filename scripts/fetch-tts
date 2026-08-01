@@ -1,0 +1,168 @@
+#!/usr/bin/env python3
+"""fetch-tts — download the narration models into models/tts.
+
+    ./scripts/fetch-tts                # both
+    ./scripts/fetch-tts indic-parler   # just one
+    ./scripts/fetch-tts --check        # report what is present and accessible
+
+Both AI4Bharat repositories are GATED. Gated means auto-approved, but somebody has to
+click once per account before any token works:
+
+    https://huggingface.co/ai4bharat/indic-parler-tts
+    https://huggingface.co/ai4bharat/IndicF5
+
+Open each page while signed in, accept the terms, then re-run this. HF_TOKEN is read
+from the gitignored .env.
+
+These are not ComfyUI weights, so they live outside the modelctl manifest: they are
+plain transformers checkpoints loaded in-process by service/pipelines/tts.py.
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+TTS_DIR = ROOT / "models" / "tts"
+
+
+def _reexec_in_venv() -> None:
+    """Re-run inside the project venv, where huggingface_hub is installed."""
+    if os.environ.get("FETCH_TTS_REEXEC") == "1":
+        return
+    python = ROOT / ".venv" / "bin" / "python"
+    if python.exists() and Path(sys.executable).resolve() != python.resolve():
+        os.environ["FETCH_TTS_REEXEC"] = "1"
+        os.execv(str(python), [str(python), str(Path(__file__).resolve()), *sys.argv[1:]])
+
+
+_reexec_in_venv()
+
+MODELS = {
+    "indic-parler": {
+        "repo": "ai4bharat/indic-parler-tts",
+        "revision": "7b527af5ee8ed1f9a28d80b19703ed9bb8ba10ca",
+        "dest": "indic-parler-tts",
+        "approx_gb": 3.76,
+        "licence": "Apache-2.0",
+        "note": "Voice chosen by description; no reference clip needed.",
+    },
+    "indicf5": {
+        "repo": "ai4bharat/IndicF5",
+        "revision": "ba85abedf18dc479a447eaa0eccbd76ab78a47d5",
+        "dest": "IndicF5",
+        "approx_gb": 1.41,
+        "licence": "MIT",
+        "note": "Clones one reference voice; best for a fixed channel narrator.",
+    },
+}
+
+
+def _load_env() -> None:
+    env = ROOT / ".env"
+    if not env.exists():
+        return
+    for line in env.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+def colour(code: str, text: str) -> str:
+    return f"\033[{code}m{text}\033[0m" if sys.stdout.isatty() else text
+
+
+def green(t): return colour("0;32", t)
+def red(t): return colour("0;31", t)
+def yellow(t): return colour("0;33", t)
+
+
+def check(key: str, meta: dict) -> bool:
+    from huggingface_hub import hf_hub_download
+    from huggingface_hub.errors import GatedRepoError, RepositoryNotFoundError
+
+    local = TTS_DIR / meta["dest"]
+    if local.exists() and any(local.rglob("*.safetensors")):
+        print(f"  {green('present')}  {key:<14} {local.relative_to(ROOT)}")
+        return True
+
+    try:
+        # model_info succeeds on a gated repo because the metadata is public; only a
+        # real file fetch proves the weights are reachable.
+        hf_hub_download(
+            repo_id=meta["repo"], revision=meta["revision"], filename="config.json",
+            token=os.environ.get("HF_TOKEN"),
+        )
+        print(f"  {yellow('missing')}  {key:<14} accessible, ~{meta['approx_gb']} GB to download")
+        return True
+    except GatedRepoError:
+        print(f"  {red('GATED')}    {key:<14} accept the terms at "
+              f"https://huggingface.co/{meta['repo']}")
+        return False
+    except RepositoryNotFoundError:
+        print(f"  {red('404')}      {key:<14} {meta['repo']} not found")
+        return False
+    except Exception as exc:  # noqa: BLE001
+        print(f"  {red('ERROR')}    {key:<14} {exc}")
+        return False
+
+
+def fetch(key: str, meta: dict) -> int:
+    from huggingface_hub import snapshot_download
+    from huggingface_hub.errors import GatedRepoError
+
+    dest = TTS_DIR / meta["dest"]
+    print(f"\n{key}: {meta['repo']} ({meta['licence']}, ~{meta['approx_gb']} GB)")
+    print(f"  {meta['note']}")
+    try:
+        snapshot_download(
+            repo_id=meta["repo"],
+            revision=meta["revision"],
+            local_dir=str(dest),
+            token=os.environ.get("HF_TOKEN"),
+            ignore_patterns=["*.msgpack", "*.h5", "*.ot", "*.onnx"],
+        )
+    except GatedRepoError:
+        print(red(
+            f"  gated: open https://huggingface.co/{meta['repo']} while signed in, "
+            "click to accept, then re-run."
+        ))
+        return 1
+    print(f"  {green('done')} -> {dest.relative_to(ROOT)}")
+    return 0
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("models", nargs="*", choices=list(MODELS),
+                        help="which models; omit for all")
+    parser.add_argument("--check", action="store_true",
+                        help="report availability without downloading")
+    args = parser.parse_args()
+
+    _load_env()
+    if not os.environ.get("HF_TOKEN"):
+        print(yellow("no HF_TOKEN in .env — gated repositories will be refused"))
+
+    selected = args.models or list(MODELS)
+    TTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    if args.check:
+        print("narration models:")
+        ok = all(check(key, MODELS[key]) for key in selected)
+        return 0 if ok else 1
+
+    failures = sum(fetch(key, MODELS[key]) for key in selected)
+    if failures:
+        print(f"\n{failures} model(s) could not be fetched.")
+    return 1 if failures else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
