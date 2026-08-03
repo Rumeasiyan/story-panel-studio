@@ -4,7 +4,7 @@ Hand this to the agent working `goal-ai-story-video-network`. It describes what 
 local generation service can and cannot do, with measured costs, so plans are built on
 facts rather than assumptions.
 
-**Service:** `ai-video-gen` at `/home/sshroot/external/ai-video-gen`, version 2.0.2.
+**Service:** `ai-video-gen` at `/home/sshroot/external/ai-video-gen`, version 2.0.3.
 **API:** `http://127.0.0.1:8189` — reachable on the LAN and Tailscale too (`0.0.0.0`).
 **Reference:** `service/API.md` in that repo. Live contract: `GET /api/pipelines`.
 **Hardware:** one RTX 3050, 8 GB VRAM. Jobs run **strictly one at a time**.
