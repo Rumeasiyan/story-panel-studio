@@ -98,3 +98,50 @@ since the VAE is required to decode every image.
 The SDXL checkpoints above also support image-to-image and inpainting natively through
 ComfyUI's built-in nodes. That covers denoise-guided transformation and masked
 regeneration; it does not cover instruction editing, which is what klein adds.
+
+## sdxl-lightning
+
+| Artifact | Repo @ revision | Size | Licence |
+|---|---|---|---|
+| `sdxl_lightning_4step_lora.safetensors` | `ByteDance/SDXL-Lightning` @ `c9a24f48` | 0.39 GB | CreativeML Open RAIL++-M |
+| `sdxl_lightning_2step_lora.safetensors` | same | 0.39 GB | same |
+
+Step-distillation LoRAs. Same Open RAIL++-M terms as the SDXL checkpoints, so the same
+commercial review applies.
+
+## noobai-xl
+
+| Artifact | Repo @ revision | Size | Licence |
+|---|---|---|---|
+| `NoobAI-XL-v1.1.safetensors` | `Laxhar/noobai-XL-1.1` @ `814a274a` | 7.11 GB | **"other"** — Fair AI Public License 1.0-SD |
+
+**Two things to resolve before commercial use.** The licence field reads "other"; the
+model card states Fair AI Public License 1.0-SD, which carries obligations the OpenRAIL
+family does not — read it directly rather than assuming. Separately, the repository
+carries a not-for-all-audiences flag: the model is capable of explicit output, so
+prompts and results need deliberate review for a monetised channel.
+
+## illustrious-xl
+
+| Artifact | Repo @ revision | Size | Licence |
+|---|---|---|---|
+| `Illustrious-XL-v2.0.safetensors` | `OnomaAIResearch/Illustrious-XL-v2.0` @ `69459c1f` | 6.94 GB | CreativeML Open RAIL-M |
+
+## z-image-turbo
+
+| Artifact | Repo @ revision | Size | Licence |
+|---|---|---|---|
+| `z_image_turbo_int8_convrot.safetensors` | `Comfy-Org/z_image_turbo` @ `d24c4cf2` | 6.20 GB | Apache-2.0 upstream; repackaged repo declares none — **verify** |
+| `ae.safetensors` | same | 0.34 GB | as above |
+
+Upstream is [Tongyi-MAI/Z-Image-Turbo](https://huggingface.co/Tongyi-MAI/Z-Image-Turbo).
+The int8 variant is used because ComfyUI drives it natively; the nvfp4 variant is
+smaller but requires a Blackwell GPU. The qwen_3_4b text encoder is shared with
+`flux2-klein-4b` and not downloaded twice.
+
+## Removed from this machine
+
+The Wan video models were deleted to make room for image models, since the still-panel
+format does not need video generation. Their profiles remain in
+`config/model-profiles.yaml` with pinned revisions, so `./scripts/modelctl install
+wan22-ti2v-5b` restores them exactly.

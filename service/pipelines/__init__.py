@@ -19,4 +19,5 @@ from . import sdxl      # noqa: F401,E402  SDXL text-to-image, img2img, inpaint
 from . import wan       # noqa: F401,E402  Wan 2.2 video
 from . import flux2     # noqa: F401,E402  FLUX.2 klein generate + instruction edit
 from . import tts       # noqa: F401,E402  IndicF5 / Indic Parler narration
+from . import z_image   # noqa: F401,E402  Z-Image Turbo few-step generation
 from . import subtitles # noqa: F401,E402  whisper alignment -> SRT/VTT/JSON

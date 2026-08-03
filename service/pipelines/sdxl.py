@@ -14,7 +14,14 @@ from .base import ComfyPipeline, Param, register
 CHECKPOINTS = {
     "anime": "animagine-xl-4.0-opt.safetensors",
     "cinematic": "RealVisXL_V4.0.safetensors",
+    "noobai": "NoobAI-XL-v1.1.safetensors",
+    "illustrious": "Illustrious-XL-v2.0.safetensors",
 }
+
+# NoobAI and Illustrious are trained on booru tagging: they expect comma-separated tags
+# ("1girl, long hair, city street, night") rather than the prose Animagine and RealVis
+# handle well. Same pipeline, different prompting style.
+BOORU_CHECKPOINTS = {"noobai", "illustrious"}
 
 SAMPLERS = ["euler", "euler_ancestral", "dpmpp_2m", "dpmpp_2m_sde", "dpmpp_sde",
             "uni_pc", "ddim", "lcm"]
@@ -35,7 +42,9 @@ COMMON = [
     Param("prompt", "str", required=True, help="What to draw."),
     Param("negative", "str", default=DEFAULT_NEGATIVE, help="What to avoid."),
     Param("model", "enum", default="anime", choices=list(CHECKPOINTS),
-          help="Which checkpoint: anime (Animagine XL 4.0) or cinematic (RealVisXL V4)."),
+          help="Checkpoint: anime (Animagine XL 4.0), cinematic (RealVisXL V4), "
+               "noobai (NoobAI-XL v1.1) or illustrious (Illustrious-XL v2.0). "
+               "The last two are booru-tag driven — prompt with comma-separated tags."),
     Param("steps", "int", default=25, minimum=1, maximum=100),
     Param("cfg", "float", default=6.0, minimum=0.0, maximum=20.0),
     Param("sampler", "enum", default="euler", choices=SAMPLERS),
@@ -44,7 +53,9 @@ COMMON = [
     Param("batch_size", "int", default=1, minimum=1, maximum=8,
           help="Images per request. Each costs the same as a separate render."),
     Param("lora", "str", default=None,
-          help="Optional LoRA filename in models/loras, e.g. a trained character LoRA."),
+          help="LoRA filename from GET /api/loras. Use a trained character LoRA for "
+               "consistency, or sdxl_lightning_4step_lora.safetensors for ~3x speed "
+               "(then set steps=4, cfg=1.5, sampler=euler, scheduler=sgm_uniform)."),
     Param("lora_strength", "float", default=0.85, minimum=0.0, maximum=2.0),
 ]
 

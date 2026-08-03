@@ -274,6 +274,48 @@ profiles:
         licence_url: https://huggingface.co/OnomaAIResearch/Illustrious-XL-v2.0
         commercial_review_required: true
 
+  z-image-turbo:
+    description: Z-Image Turbo — fast text-to-image, few-step distilled
+    engine: comfyui
+    workflow_family: z-image
+    notes: >-
+      int8 variant, which the official ComfyUI template image_z_image_turbo_int8 drives
+      natively — no GGUF custom node needed. Reuses the qwen_3_4b text encoder already
+      installed for FLUX.2, so only the transformer and its VAE are downloaded. The
+      nvfp4 variant is smaller but needs a Blackwell GPU, so it is not used here.
+    artifacts:
+      - id: z-image-turbo-int8
+        repository: Comfy-Org/z_image_turbo
+        revision: d24c4cf2a0cd98a42f23467e27e3d76ee9438b8e
+        filename: split_files/diffusion_models/z_image_turbo_int8_convrot.safetensors
+        destination: models/diffusion_models
+        size_bytes: 6201001296
+        sha256: be517ebd47c912a5626a588e1aeea43e6be4a43c0cdcd2b48a2a780d9f358635
+        licence: Apache-2.0 (Tongyi Z-Image upstream; repackaged repo declares none)
+        licence_url: https://huggingface.co/Tongyi-MAI/Z-Image-Turbo
+        commercial_review_required: true
+      - id: z-image-vae
+        repository: Comfy-Org/z_image_turbo
+        revision: d24c4cf2a0cd98a42f23467e27e3d76ee9438b8e
+        filename: split_files/vae/ae.safetensors
+        destination: models/vae
+        size_bytes: 335304388
+        sha256: afc8e28272cd15db3919bacdb6918ce9c1ed22e96cb12c4d5ed0fba823529e38
+        licence: Apache-2.0 (as above)
+        licence_url: https://huggingface.co/Comfy-Org/z_image_turbo
+        commercial_review_required: true
+      # Shared with flux2-klein-4b; already on disk if that profile is installed.
+      - id: qwen3-4b-text-encoder
+        repository: Comfy-Org/z_image_turbo
+        revision: d24c4cf2a0cd98a42f23467e27e3d76ee9438b8e
+        filename: split_files/text_encoders/qwen_3_4b.safetensors
+        destination: models/text_encoders
+        size_bytes: 8044982048
+        sha256: f459cd74b7868799ea82f97601a650afcedc399596dc262f302e3505761c9995
+        licence: Apache-2.0 (Qwen3 upstream; repackaged repo declares none)
+        licence_url: https://huggingface.co/Qwen/Qwen3-4B
+        commercial_review_required: true
+
 # Future profiles (newer anime/cinematic checkpoints, Wan 2.1, quantized variants,
 # LoRA packs, private character LoRAs, API-only providers) are added by appending
 # entries here. Nothing is downloaded until `./scripts/modelctl install <profile>`
