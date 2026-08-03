@@ -21,6 +21,7 @@ import json
 import os
 import shutil
 import subprocess
+import time
 import sys
 from pathlib import Path
 
@@ -231,11 +232,22 @@ def artifact_url(art: dict) -> str:
     )
 
 
+ARIA2_ATTEMPTS = 6
+
+
 def aria2_download(art: dict, tmp: Path) -> None:
     """Fetch one artifact directly from the CDN with parallel ranges.
 
     Writes to `tmp` and resumes an existing partial file. Raises SystemExit on failure,
     leaving the partial file in place so a re-run continues where it stopped.
+
+    Retries the whole aria2 invocation, not just the request. huggingface.co redirects
+    to a CDN URL presigned with an `Expires` parameter; aria2 resolves that redirect
+    once and reuses the presigned URLs for the entire transfer, so a multi-gigabyte file
+    on a slow link outlives its own signatures and every connection starts returning
+    403. aria2's --max-tries cannot fix that because it reuses the dead URL. A fresh
+    invocation re-resolves the redirect and gets new signatures, while --continue picks
+    up from the partial file, so nothing is re-downloaded.
     """
     cmd = [
         "aria2c",
@@ -257,12 +269,24 @@ def aria2_download(art: dict, tmp: Path) -> None:
     if token:
         cmd.append(f"--header=Authorization: Bearer {token}")
 
-    result = subprocess.run(cmd)
-    if result.returncode != 0:
-        sys.exit(
-            f"aria2c failed for {art['id']} (exit {result.returncode}). "
-            f"The partial file was kept at {tmp}; re-run install to resume."
-        )
+    for attempt in range(1, ARIA2_ATTEMPTS + 1):
+        result = subprocess.run(cmd)
+        if result.returncode == 0:
+            return
+        # 22 is aria2's "HTTP error" code, which is what an expired signature surfaces as.
+        if attempt < ARIA2_ATTEMPTS:
+            done = tmp.stat().st_size if tmp.exists() else 0
+            print(Colour.yellow(
+                f"  aria2c exit {result.returncode} at {human(done)}; "
+                f"re-resolving the download URL (attempt {attempt + 1}/{ARIA2_ATTEMPTS})"
+            ))
+            time.sleep(3)
+
+    sys.exit(
+        f"aria2c failed for {art['id']} after {ARIA2_ATTEMPTS} attempts "
+        f"(exit {result.returncode}). The partial file was kept at {tmp}; "
+        "re-run install to resume from where it stopped."
+    )
 
 
 WORKFLOW_REMINDER = (

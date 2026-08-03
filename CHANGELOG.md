@@ -3,6 +3,15 @@
 Notable changes per version. The version lives in `VERSION`; see AGENTS.md for when
 each part changes.
 
+## 2.0.1 — 2026-08-03
+
+### Fixed
+- Large model downloads aborted with HTTP 403 partway through. Hugging Face redirects
+  to a CDN URL presigned with an expiry; aria2 resolved that redirect once and reused
+  the signatures for the whole transfer, so any file big enough to outlive them failed.
+  `aria2_download` now retries the whole invocation, which re-resolves the redirect for
+  fresh signatures while `--continue` resumes from the partial file. (#4)
+
 ## 2.0.0 — 2026-08-03
 
 First versioned release. The service was rewritten from a single-purpose Wan video UI
