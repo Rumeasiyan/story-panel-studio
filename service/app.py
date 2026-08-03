@@ -34,6 +34,7 @@ import pipelines
 import voices
 from config import (
     DATA_DIR,
+    VERSION,
     MAX_UPLOAD_BYTES,
     MODELS_DIR,
     OUTPUT_DIR,
@@ -64,7 +65,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="ai-video-gen generation API",
     description=__doc__,
-    version="2.0.0",
+    version=VERSION,
     lifespan=lifespan,
 )
 

@@ -7,6 +7,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
+# Single source of truth for the application version. Anything that displays a version
+# reads it from here rather than hardcoding one, so the two cannot drift apart.
+VERSION_FILE = ROOT / "VERSION"
+VERSION = VERSION_FILE.read_text().strip() if VERSION_FILE.exists() else "0.0.0"
+
 SERVICE_DIR = ROOT / "service"
 DATA_DIR = SERVICE_DIR / "data"
 THUMB_DIR = DATA_DIR / "thumbs"
