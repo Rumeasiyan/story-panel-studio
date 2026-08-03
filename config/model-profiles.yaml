@@ -136,16 +136,21 @@ profiles:
         licence: Apache-2.0 (Qwen3 upstream; repackaged repo declares none)
         licence_url: https://huggingface.co/Qwen/Qwen3-4B
         commercial_review_required: true
-      - id: flux2-vae
-        repository: Comfy-Org/flux2-dev
-        revision: 03d6521e6f6a47396b3f951cbea50f7e6c2f482e
-        filename: split_files/vae/flux2-vae.safetensors
+      # klein's own VAE, not the one in the flux2-dev repackage. The dev repackage
+      # declares the FLUX non-commercial licence, and the VAE decodes every image the
+      # model produces, so its terms would govern the output. This one is Apache-2.0
+      # like the rest of klein, and it is half the size.
+      - id: flux2-klein-vae
+        repository: black-forest-labs/FLUX.2-klein-4B
+        revision: e7b7dc27f91deacad38e78976d1f2b499d76a294
+        filename: vae/diffusion_pytorch_model.safetensors
+        local_filename: flux2-klein-vae-apache.safetensors
         destination: models/vae
-        size_bytes: 336213556
-        sha256: bb534d41e8e6f92dc8636b914489b7167aeb950418183ffc10768c573185683a
-        licence: VERIFY — repository declares "other", not Apache-2.0
-        licence_url: https://huggingface.co/Comfy-Org/flux2-dev
-        commercial_review_required: true
+        size_bytes: 168120878
+        sha256: ca70d2202afe6415bdbcb8793ba8cd99fd159cfe6192381504d6c4d3036e0f04
+        licence: Apache-2.0
+        licence_url: https://huggingface.co/black-forest-labs/FLUX.2-klein-4B
+        commercial_review_required: false
 
   wan21-fun-inp-1.3b:
     description: Wan 2.1 Fun-InP 1.3B — fast image-to-video for iteration

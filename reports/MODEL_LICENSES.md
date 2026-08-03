@@ -88,10 +88,17 @@ Unified image generation and instruction editing. Resolved 2026-08-01.
 | `qwen_3_4b.safetensors` | `Comfy-Org/z_image_turbo` @ `d24c4cf2` | 8.04 GB | `f459cd74b7868799ea82f97601a650afcedc399596dc262f302e3505761c9995` | Qwen3 upstream is Apache-2.0; the repackaged repo declares none — **verify** |
 | `flux2-vae.safetensors` | `Comfy-Org/flux2-dev` @ `03d6521e` | 0.34 GB | `bb534d41e8e6f92dc8636b914489b7167aeb950418183ffc10768c573185683a` | repository declares **"other"**, not Apache-2.0 — **verify before commercial use** |
 
-The klein 4B weights themselves are Apache-2.0, which is unusually permissive for this
-family (FLUX.1 dev is non-commercial). The VAE ships from the FLUX.2 *dev* repository,
-whose licence field reads "other" — resolve that before shipping anything commercially,
-since the VAE is required to decode every image.
+**Resolved 2026-08-04.** The whole FLUX.2 path here is Apache-2.0.
+
+The ComfyUI template points at the VAE in `Comfy-Org/flux2-dev`, whose licence is
+`flux-1-dev-non-commercial-license` — genuinely non-commercial, not merely unlabelled.
+Because the VAE decodes every image the model produces, using it would have put
+non-commercial terms on the output regardless of klein's Apache-2.0 weights.
+
+klein ships its own VAE at `vae/diffusion_pytorch_model.safetensors` under Apache-2.0,
+half the size (168 MB against 336 MB — the same VAE at different precision). The
+pipeline uses that one, and the non-commercial file has been deleted from disk.
+Verified by generating through it: clean decode, correct colour, no artifacts.
 
 ## Image editing without extra models
 

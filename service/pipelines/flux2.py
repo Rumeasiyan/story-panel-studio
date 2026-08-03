@@ -14,7 +14,11 @@ from .base import ComfyPipeline, Param, register
 
 MODEL = "flux-2-klein-4b-fp8.safetensors"
 TEXT_ENCODER = "qwen_3_4b.safetensors"
-VAE = "flux2-vae.safetensors"
+# klein ships its own VAE under Apache-2.0. The otherwise-identical VAE in the
+# Comfy-Org/flux2-dev repackage carries the FLUX non-commercial licence, and since the
+# VAE decodes every image the model produces, its terms would govern the output. Using
+# klein's own keeps the whole path Apache-2.0.
+VAE = "flux2-klein-vae-apache.safetensors"
 
 MAX_REFERENCES = 4
 
