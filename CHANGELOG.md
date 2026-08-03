@@ -3,6 +3,15 @@
 Notable changes per version. The version lives in `VERSION`; see AGENTS.md for when
 each part changes.
 
+## 2.0.3 — 2026-08-04
+
+### Fixed
+- FLUX.2 decoded through the VAE in `Comfy-Org/flux2-dev`, which carries the FLUX
+  non-commercial licence. Because the VAE decodes every image, that licence would have
+  governed the output despite klein's own weights being Apache-2.0. Switched to klein's
+  own Apache-2.0 VAE (168 MB, the same VAE at different precision) and deleted the
+  non-commercial file. The whole FLUX.2 path is now Apache-2.0. (#3)
+
 ## 2.0.2 — 2026-08-03
 
 ### Fixed

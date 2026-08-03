@@ -148,7 +148,7 @@ Outputs SRT, VTT, and JSON with per-word timings (usable for karaoke-style rende
 |---|---|
 | One GPU, one job at a time | Queue depth is real. 4 videos/day of panels is ~40 min serial; nothing runs in parallel. |
 | Local only, £0 per-use | Satisfies the $50/month opex cap. No hosted image API is needed or used. |
-| **FLUX.2 VAE licence unresolved** | Repo declares "other", and the VAE decodes every FLUX.2 image. Resolve before publishing FLUX.2 output commercially. Issue #3. |
+| FLUX.2 path is Apache-2.0 | Resolved. The VAE shipped in the ComfyUI template was non-commercial; klein's own Apache-2.0 VAE is used instead. No restriction on FLUX.2 output. |
 | **NoobAI licence is "other"** (Fair AI Public License 1.0-SD) and the repo carries a not-for-all-audiences flag | Review before a monetised channel. The model can produce explicit output. |
 | SDXL checkpoints are Open RAIL++-M | Use-based restrictions must be passed downstream. |
 | Service has **no authentication** and is bound to `0.0.0.0` | Anything on the network can queue jobs and read or delete history. Fine on a trusted LAN; do not expose further. |
@@ -186,4 +186,4 @@ not the request, so any panel can be regenerated exactly.
 |---|---|
 | #1 character LoRA needed | Blocks serialised characters. Schedule the character-sheet + training task before channel launch. |
 | #2 IndicF5 broken | No voice cloning. Parler descriptions are the working path. |
-| #3 FLUX.2 VAE licence | Blocks commercial use of FLUX.2 output until resolved. SDXL models are unaffected. |
+| ~~#3 FLUX.2 VAE licence~~ | **Closed.** FLUX.2 output is Apache-2.0 and carries no commercial restriction. |
