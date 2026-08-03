@@ -202,6 +202,78 @@ profiles:
         commercial_review_required: false
 
 
+  sdxl-lightning:
+    description: SDXL Lightning step-distillation LoRAs (2 and 4 step)
+    engine: comfyui
+    workflow_family: sdxl
+    notes: >-
+      Cuts SDXL sampling from 25 steps to 4 (or 2), roughly 3-5x faster per panel, at
+      some cost in fine detail. Apply through the `lora` parameter on any SDXL pipeline
+      and drop `steps` to match; use cfg 1-2 and a simple sampler (euler, sgm_uniform).
+      Works with any SDXL checkpoint here, including NoobAI and Illustrious.
+    artifacts:
+      - id: sdxl-lightning-4step
+        repository: ByteDance/SDXL-Lightning
+        revision: c9a24f48e1c025556787b0c58dd67a091ece2e44
+        filename: sdxl_lightning_4step_lora.safetensors
+        destination: models/loras
+        size_bytes: 393854592
+        sha256: bf56cf2657efb15e465d81402ed481d1e11c4677e4bcce1bc11fe71ad8506b79
+        licence: CreativeML Open RAIL++-M (openrail++)
+        licence_url: https://huggingface.co/ByteDance/SDXL-Lightning
+        commercial_review_required: true
+      - id: sdxl-lightning-2step
+        repository: ByteDance/SDXL-Lightning
+        revision: c9a24f48e1c025556787b0c58dd67a091ece2e44
+        filename: sdxl_lightning_2step_lora.safetensors
+        destination: models/loras
+        size_bytes: 393854592
+        sha256: 04fafc778385b24144498a8247498ae4fb7a69f702ea0566bdce2845a31fcc43
+        licence: CreativeML Open RAIL++-M (openrail++)
+        licence_url: https://huggingface.co/ByteDance/SDXL-Lightning
+        commercial_review_required: true
+
+  noobai-xl:
+    description: NoobAI-XL v1.1 — anime/manhwa SDXL checkpoint
+    engine: comfyui
+    workflow_family: sdxl
+    notes: >-
+      Anime checkpoint trained on Danbooru/e621 tagging, so it responds to booru-style
+      tag prompts rather than prose. Strong character and pose control for panel work.
+      Capable of explicit output; the repository carries a not-for-all-audiences flag,
+      so prompt and review deliberately for a monetised channel.
+    artifacts:
+      - id: noobai-xl-11
+        repository: Laxhar/noobai-XL-1.1
+        revision: 814a274af2b8097c0828819d561ec74c7d0c6cea
+        filename: NoobAI-XL-v1.1.safetensors
+        destination: models/checkpoints
+        size_bytes: 7105349958
+        sha256: 6681e8e4b134c81f16533acedb0d406d7e5e366e1624b4105178c64d00b05d51
+        licence: "other — Fair AI Public License 1.0-SD; VERIFY before commercial use"
+        licence_url: https://huggingface.co/Laxhar/noobai-XL-1.1
+        commercial_review_required: true
+
+  illustrious-xl:
+    description: Illustrious-XL v2.0 — anime/illustration SDXL checkpoint
+    engine: comfyui
+    workflow_family: sdxl
+    notes: >-
+      Anime/illustration checkpoint, also booru-tag driven. A cleaner-styled alternative
+      to NoobAI for the same panel role; worth A/B testing both on the same prompt before
+      committing a channel to one look.
+    artifacts:
+      - id: illustrious-xl-20
+        repository: OnomaAIResearch/Illustrious-XL-v2.0
+        revision: 69459c1fe6f46db41ab31e6114f05acc0e06bcaa
+        filename: Illustrious-XL-v2.0.safetensors
+        destination: models/checkpoints
+        size_bytes: 6938040674
+        sha256: c2a1a3eaa13d4c107dc7e00c3fe830cab427aa026362740ea094745b3422a331
+        licence: CreativeML Open RAIL-M
+        licence_url: https://huggingface.co/OnomaAIResearch/Illustrious-XL-v2.0
+        commercial_review_required: true
+
 # Future profiles (newer anime/cinematic checkpoints, Wan 2.1, quantized variants,
 # LoRA packs, private character LoRAs, API-only providers) are added by appending
 # entries here. Nothing is downloaded until `./scripts/modelctl install <profile>`

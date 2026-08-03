@@ -76,7 +76,24 @@ quality change. 1024x1024 measured separately at 35.2 s single.
 | 90 | 21 min | 1.4 h |
 | 120 | 28 min | 1.9 h |
 
-A 4-step Lightning LoRA would cut this roughly 3-5x again.
+### SDXL Lightning LoRA (measured, batch_size 4, 1024x576)
+
+| steps | LoRA | cfg | per image | speedup |
+|---|---|---|---|---|
+| 25 | none | 6.0 | 15.4 s | 1.0x |
+| **4** | **lightning 4step** | **1.5** | **5.0 s** | **3.1x** |
+| 2 | lightning 2step | 1.0 | 3.8 s | 4.1x |
+
+Use `euler` / `sgm_uniform` and low cfg with Lightning; the usual cfg 6 washes out at
+these step counts. Detail is softer than 25 steps, so the practical pattern is drafting
+at 2-4 steps and re-rendering keepers at 25.
+
+Panel volume with the 4-step LoRA:
+
+| panels per video | one video | four videos |
+|---|---|---|
+| 60 | 5 min | 20 min |
+| 120 | 10 min | 40 min |
 
 ### Subtitles
 
