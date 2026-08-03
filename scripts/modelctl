@@ -21,6 +21,7 @@ import json
 import os
 import shutil
 import subprocess
+import tempfile
 import time
 import sys
 from pathlib import Path
@@ -265,10 +266,28 @@ def aria2_download(art: dict, tmp: Path) -> None:
         "--console-log-level=warn",
         "--summary-interval=10",
     ]
-    token = os.environ.get("HF_TOKEN")
-    if token:
-        cmd.append(f"--header=Authorization: Bearer {token}")
 
+    # The token goes in a mode-600 config file, never on the command line: argv is
+    # world-readable through /proc for the whole download, and a multi-gigabyte model
+    # keeps it there for an hour.
+    token = os.environ.get("HF_TOKEN")
+    conf: Path | None = None
+    if token:
+        handle, conf_name = tempfile.mkstemp(prefix=".aria2-", dir=str(tmp.parent))
+        os.write(handle, f"header=Authorization: Bearer {token}\n".encode())
+        os.close(handle)
+        conf = Path(conf_name)
+        conf.chmod(0o600)
+        cmd.append(f"--conf-path={conf}")
+
+    try:
+        _run_aria2_with_retries(cmd, art, tmp)
+    finally:
+        if conf is not None:
+            conf.unlink(missing_ok=True)
+
+
+def _run_aria2_with_retries(cmd: list[str], art: dict, tmp: Path) -> None:
     for attempt in range(1, ARIA2_ATTEMPTS + 1):
         result = subprocess.run(cmd)
         if result.returncode == 0:

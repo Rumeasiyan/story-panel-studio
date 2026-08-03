@@ -3,6 +3,14 @@
 Notable changes per version. The version lives in `VERSION`; see AGENTS.md for when
 each part changes.
 
+## 2.0.2 — 2026-08-03
+
+### Fixed
+- The Hugging Face token was passed to aria2 as a command-line argument, making it
+  readable by any local process through `/proc` for the whole duration of a download.
+  It now goes in a mode-600 config file passed with `--conf-path`, removed in a
+  `finally`. (#5)
+
 ## 2.0.1 — 2026-08-03
 
 ### Fixed
