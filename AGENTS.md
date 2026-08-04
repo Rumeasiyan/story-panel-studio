@@ -100,7 +100,7 @@ There is no test suite and no linter config. Verification here is running the th
 | | |
 |---|---|
 | Canonical source | `VERSION` at the repository root |
-| Current version | `2.0.0` |
+| Current version | `2.1.0` |
 | Build number | none — this is not a packaged application |
 | Displayed at | `GET /api/status` and `/docs`, read via `config.VERSION` |
 
