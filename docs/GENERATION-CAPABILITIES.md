@@ -100,6 +100,13 @@ Adequate for one video; **not adequate for a serialised protagonist**. Plan for 
 **trained character LoRA per recurring character**: roughly 25 curated images, trained
 once, then free at inference via the `lora` parameter on any SDXL pipeline.
 
+**Training is available.** `./scripts/train-lora --name <char> --images <dir>` runs
+kohya-ss sd-scripts (pinned submodule, isolated venv) with settings tuned for 8 GB —
+gradient checkpointing, cached latents, 8-bit Adam, UNet-only. Defaults to 768px because
+SDXL at 1024 is the tightest this card accepts. Train against the same checkpoint the
+panels will use; `--base` takes the same ids as the `model` parameter. The character name
+becomes the trigger word and must appear in every prompt.
+
 Precursor task: generate a character sheet — one character, multiple angles and
 expressions — which doubles as the LoRA training set.
 
@@ -120,8 +127,15 @@ POST /api/voices    {"name": "...", "engine": "indic-parler",
                      "language": "ta", "voice_description": "..."}
 ```
 
-Two are already registered: `narrator-en-cinematic`, `narrator-tamil-anime`. Four
-channels need four profiles.
+Two English profiles are registered and verified working:
+
+| Voice | Character |
+|---|---|
+| `c1-en-anime-male` | energetic mid-register male, fast, close-mic |
+| `c3-en-cinematic-female` | warm low-pitched female, slow and intimate |
+
+Tamil channels need their own profiles when those launch — the same engine covers Tamil,
+only the description changes.
 
 Long text is chunked on sentence boundaries — including the Devanagari danda — and
 concatenated with identical conditioning, so scripts of any length are one request.

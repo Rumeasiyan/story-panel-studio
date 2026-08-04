@@ -1,3 +1,6 @@
 [submodule "engine/ComfyUI"]
 	path = engine/ComfyUI
 	url = https://github.com/Comfy-Org/ComfyUI.git
+[submodule "tools/sd-scripts"]
+	path = tools/sd-scripts
+	url = https://github.com/kohya-ss/sd-scripts.git

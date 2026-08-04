@@ -72,3 +72,5 @@ logs/*.md
 service/data/
 cache/object-info.json
 .venv-parler/
+.venv-trainer/
+characters/_training/

@@ -32,7 +32,8 @@ environments are never committed; they are rebuilt from pinned manifests.
 | `service/jobs.py` | SQLite job store and the single serialized worker. |
 | `config/model-profiles.yaml` | Every model: pinned revision, size, SHA-256, licence. |
 | `config/extra_model_paths.yaml` | How ComfyUI finds weights in the root `models/`. |
-| `scripts/` | `doctor`, `comfy`, `serve`, `modelctl`, `forget-generation`, `fetch-tts`. |
+| `scripts/` | `doctor`, `comfy`, `serve`, `modelctl`, `forget-generation`, `fetch-tts`, `train-lora`. |
+| `tools/sd-scripts` | kohya-ss trainer, pinned submodule. Runs in `.venv-trainer`. |
 | `reports/BENCHMARKS.md` | Measured timings on this exact machine. Use these, do not guess. |
 | `reports/MODEL_LICENSES.md` | Licence position per model, including the unresolved ones. |
 | `docs/DECISIONS.md` | Why things are the way they are. Read before reversing a decision. |
@@ -46,7 +47,7 @@ Each of these has already caused, or nearly caused, a real failure here.
 |---|---|---|
 | ComfyUI binds to `127.0.0.1` only | `/prompt` executes arbitrary node graphs. Exposing it is remote code execution on this workstation. | `scripts/comfy.sh` refuses non-loopback `COMFY_HOST` |
 | User input never becomes graph structure | Same reason. Pipelines fill typed fields into a fixed template; a caller-supplied graph would be arbitrary execution. | `service/pipelines/*.py` build functions |
-| Never install a model's dependencies into `.venv` without checking `transformers` and `torch` after | `parler-tts` pins `transformers==4.46.1`; ComfyUI needs `>=4.50.3`. Installing it downgraded transformers and left the image engine one restart from breaking. | `.venv-parler` isolation; `pipelines/parler_worker.py` |
+| Never install a model's dependencies into `.venv` without checking `transformers` and `torch` after | `parler-tts` pins `transformers==4.46.1` and sd-scripts pins `4.54.1`; ComfyUI needs `>=4.50.3`. Installing parler into `.venv` downgraded transformers and left the image engine one restart from breaking. | `.venv-parler`, `.venv-trainer` isolation |
 | Weights live once under root `models/`, never inside `engine/ComfyUI/models` | Keeps the submodule clean and lets other engines share the store. | `config/extra_model_paths.yaml` |
 | Never commit weights, renders, inputs, `.env`, or caches | A 7 GB checkpoint in git history is effectively permanent. | `.githooks/pre-commit`, `.github/workflows/repository-safety.yml` |
 | Pin every model to a commit SHA, never `main` | `main` moves; a floating pin makes a "reproducible" manifest a lie. | `config/model-profiles.yaml` |
@@ -71,6 +72,8 @@ make help                         # every wrapper target
 Models and assets:
 
 ```bash
+./scripts/train-lora --check          # verify the trainer environment
+./scripts/train-lora --name <char> --images <dir> [--base illustrious] [--resolution 768]
 ./scripts/modelctl list|status|show <p>|install <p>|verify <p> [--hash]|disk
 ./scripts/fetch-tts [--check]     # narration models (gated: accept terms on HF first)
 ./scripts/custom-nodectl list|verify|install <id>

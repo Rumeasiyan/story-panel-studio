@@ -1,0 +1,237 @@
+#!/usr/bin/env python3
+"""train-lora — train a character LoRA for an SDXL checkpoint on 8 GB VRAM.
+
+    ./scripts/train-lora --name kai --images characters/kai/images
+    ./scripts/train-lora --name kai --images characters/kai/images --base noobai
+    ./scripts/train-lora --name kai --images ... --resolution 1024   # if VRAM allows
+    ./scripts/train-lora --check                                     # environment only
+
+Why this exists: the service can *use* a LoRA but had no way to *train* one, and a
+trained character LoRA is the only method that held identity across a long panel run
+(see issue #1 — prompt-only drifted, and an explicit scar tag was ignored in 18 of 20
+panels).
+
+Runs kohya-ss/sd-scripts, pinned as a submodule, inside .venv-trainer. It needs its own
+environment because it pins transformers 4.54.1 while the main venv runs 5.14.1 for
+ComfyUI; installing it into .venv would repeat the parler-tts incident.
+
+The defaults below are tuned for 8 GB and are not sd-scripts' defaults. Training SDXL on
+this card only fits because every one of them is set: without gradient checkpointing,
+cached latents, an 8-bit optimiser and UNet-only training it will OOM.
+"""
+
+from __future__ import annotations
+
+import argparse
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+SD_SCRIPTS = ROOT / "tools" / "sd-scripts"
+TRAINER_PY = ROOT / ".venv-trainer" / "bin" / "python"
+ACCELERATE = ROOT / ".venv-trainer" / "bin" / "accelerate"
+OUTPUT_DIR = ROOT / "models" / "loras"
+
+# Checkpoint ids match the `model` parameter on the SDXL pipelines, so a LoRA is trained
+# against the same weights it will be used with. Mixing them degrades quality quietly.
+BASE_CHECKPOINTS = {
+    "anime": "animagine-xl-4.0-opt.safetensors",
+    "noobai": "NoobAI-XL-v1.1.safetensors",
+    "illustrious": "Illustrious-XL-v2.0.safetensors",
+    "cinematic": "RealVisXL_V4.0.safetensors",
+}
+
+IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
+
+
+def colour(code: str, text: str) -> str:
+    return f"\033[{code}m{text}\033[0m" if sys.stdout.isatty() else text
+
+
+def green(t): return colour("0;32", t)
+def red(t): return colour("0;31", t)
+def yellow(t): return colour("0;33", t)
+def bold(t): return colour("1", t)
+
+
+def check_environment(verbose: bool = True) -> bool:
+    ok = True
+    if not SD_SCRIPTS.joinpath("sdxl_train_network.py").exists():
+        print(red("  sd-scripts missing — run: git submodule update --init tools/sd-scripts"))
+        ok = False
+    elif verbose:
+        print(green("  sd-scripts present"))
+
+    if not TRAINER_PY.exists():
+        print(red("  .venv-trainer missing — see the rebuild steps in AGENTS.md"))
+        ok = False
+    else:
+        probe = subprocess.run(
+            [str(TRAINER_PY), "-c",
+             "import torch,transformers,bitsandbytes;"
+             "print(torch.__version__, torch.cuda.is_available(), transformers.__version__)"],
+            capture_output=True, text=True,
+        )
+        if probe.returncode != 0:
+            print(red(f"  .venv-trainer broken: {probe.stderr.strip().splitlines()[-1:]}"))
+            ok = False
+        elif verbose:
+            print(green(f"  .venv-trainer ok — {probe.stdout.strip()}"))
+
+    if verbose and shutil.which("nvidia-smi"):
+        vram = subprocess.run(
+            ["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader"],
+            capture_output=True, text=True).stdout.strip()
+        print(f"  GPU memory: {vram}")
+    return ok
+
+
+def collect_images(folder: Path) -> list[Path]:
+    return sorted(p for p in folder.rglob("*") if p.suffix.lower() in IMAGE_SUFFIXES)
+
+
+def prepare_dataset(images: Path, name: str, repeats: int) -> Path:
+    """sd-scripts expects <root>/<repeats>_<token>/ as the image folder."""
+    staging = ROOT / "characters" / "_training" / name
+    if staging.exists():
+        shutil.rmtree(staging)
+    target = staging / f"{repeats}_{name}"
+    target.mkdir(parents=True)
+
+    found = collect_images(images)
+    for src in found:
+        shutil.copy2(src, target / src.name)
+        # A caption beside each image, if one exists, otherwise the trigger word alone.
+        caption = src.with_suffix(".txt")
+        dest_caption = (target / src.name).with_suffix(".txt")
+        if caption.exists():
+            shutil.copy2(caption, dest_caption)
+        else:
+            dest_caption.write_text(f"{name}\n", encoding="utf-8")
+    return staging
+
+
+def train(args) -> int:
+    if not check_environment(verbose=False):
+        print(red("environment is not ready; run --check"))
+        return 1
+
+    images = Path(args.images).resolve()
+    if not images.is_dir():
+        print(red(f"no such directory: {images}"))
+        return 1
+
+    found = collect_images(images)
+    if len(found) < 8:
+        print(red(f"only {len(found)} images found. A character LoRA needs roughly 20-30 "
+                  "varied shots: different angles, expressions and framing. Fewer than "
+                  "that overfits to one pose."))
+        return 1
+
+    base = BASE_CHECKPOINTS[args.base]
+    base_path = ROOT / "models" / "checkpoints" / base
+    if not base_path.exists():
+        print(red(f"base checkpoint missing: {base_path}"))
+        return 1
+
+    staging = prepare_dataset(images, args.name, args.repeats)
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    steps = len(found) * args.repeats * args.epochs
+    print(bold(f"\ntraining {args.name}"))
+    print(f"  base        : {args.base} ({base})")
+    print(f"  images      : {len(found)}  x{args.repeats} repeats  x{args.epochs} epochs")
+    print(f"  total steps : ~{steps}")
+    print(f"  resolution  : {args.resolution}")
+    print(f"  output      : models/loras/{args.name}.safetensors")
+    print(f"  trigger word: {args.name}\n")
+
+    command = [
+        str(ACCELERATE), "launch",
+        "--num_cpu_threads_per_process", "2",
+        str(SD_SCRIPTS / "sdxl_train_network.py"),
+        f"--pretrained_model_name_or_path={base_path}",
+        f"--train_data_dir={staging}",
+        f"--output_dir={OUTPUT_DIR}",
+        f"--output_name={args.name}",
+        "--save_model_as=safetensors",
+        "--network_module=networks.lora",
+        f"--network_dim={args.dim}",
+        f"--network_alpha={args.alpha}",
+        f"--resolution={args.resolution},{args.resolution}",
+        f"--max_train_epochs={args.epochs}",
+        f"--learning_rate={args.lr}",
+        "--lr_scheduler=cosine_with_restarts",
+        "--lr_warmup_steps=0",
+        "--train_batch_size=1",
+        "--mixed_precision=bf16",
+        "--save_precision=bf16",
+        # Everything below is what makes SDXL fit in 8 GB. Removing any one of them
+        # will OOM on this card.
+        "--gradient_checkpointing",
+        "--cache_latents",
+        "--cache_latents_to_disk",
+        "--optimizer_type=AdamW8bit",
+        "--network_train_unet_only",
+        "--max_data_loader_n_workers=1",
+        "--persistent_data_loader_workers",
+        "--xformers" if args.xformers else "--sdpa",
+        "--bucket_reso_steps=64",
+        "--enable_bucket",
+        "--min_bucket_reso=512",
+        f"--max_bucket_reso={args.resolution}",
+        "--save_every_n_epochs=1",
+        "--seed=42",
+    ]
+
+    print(yellow("  (first run also caches latents, which takes a few minutes)\n"))
+    result = subprocess.run(command, cwd=str(SD_SCRIPTS))
+    if result.returncode != 0:
+        print(red(f"\ntraining failed (exit {result.returncode})."))
+        print("If it ran out of memory, drop --resolution to 768 or 512; SDXL at 1024 "
+              "is the tightest configuration this card will accept.")
+        return result.returncode
+
+    final = OUTPUT_DIR / f"{args.name}.safetensors"
+    print(green(f"\ndone: {final.relative_to(ROOT)}"))
+    print("\nUse it through the API:")
+    print(f'  {{"pipeline": "sdxl-text-to-image", "model": "{args.base}",')
+    print(f'   "lora": "{args.name}.safetensors", "lora_strength": 0.8,')
+    print(f'   "prompt": "{args.name}, ..."}}')
+    print(f"\nThe trigger word is '{args.name}' — include it in every prompt, or the "
+          "LoRA contributes nothing.")
+    return 0
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--name", help="character name; also the LoRA filename and trigger word")
+    parser.add_argument("--images", help="directory of training images")
+    parser.add_argument("--base", default="illustrious", choices=list(BASE_CHECKPOINTS),
+                        help="checkpoint to train against; use the same one at inference")
+    parser.add_argument("--resolution", type=int, default=768,
+                        help="768 is the safe default on 8 GB; 1024 is tight")
+    parser.add_argument("--dim", type=int, default=16, help="LoRA rank")
+    parser.add_argument("--alpha", type=int, default=8)
+    parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--repeats", type=int, default=10)
+    parser.add_argument("--lr", default="1e-4")
+    parser.add_argument("--xformers", action="store_true",
+                        help="use xformers instead of sdpa attention")
+    parser.add_argument("--check", action="store_true", help="verify the environment only")
+    args = parser.parse_args()
+
+    if args.check:
+        print(bold("LoRA training environment"))
+        return 0 if check_environment() else 1
+
+    if not args.name or not args.images:
+        parser.error("--name and --images are required (or use --check)")
+    return train(args)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

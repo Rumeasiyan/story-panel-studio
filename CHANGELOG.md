@@ -3,6 +3,21 @@
 Notable changes per version. The version lives in `VERSION`; see AGENTS.md for when
 each part changes.
 
+## 2.1.0 — 2026-08-04
+
+### Added
+- `scripts/train-lora` — trains a character LoRA on 8 GB, using kohya-ss sd-scripts
+  pinned as a submodule at `tools/sd-scripts` and isolated in `.venv-trainer` (it pins
+  transformers 4.54.1 against the main venv's 5.14.1). Closes the gap where the service
+  could use a LoRA but not produce one, which blocked the only method shown to hold
+  character identity across a panel run.
+
+### Changed
+- Replaced both voice profiles. `narrator-en-cinematic` was registered against the
+  broken IndicF5 engine with an empty description and could never have run;
+  `narrator-tamil-anime` was Tamil. Now `c1-en-anime-male` and
+  `c3-en-cinematic-female`, both on Indic Parler and both verified generating audio.
+
 ## 2.0.3 — 2026-08-04
 
 ### Fixed
