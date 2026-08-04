@@ -3,6 +3,19 @@
 Notable changes per version. The version lives in `VERSION`; see AGENTS.md for when
 each part changes.
 
+## 2.2.0 — 2026-08-04
+
+### Added
+- First trained character LoRA (`models/loras/kai.safetensors`) and the workflow that
+  produced it: generate candidates, curate, train, verify against the prompt-only
+  baseline. Character identity now holds across a panel sequence where it previously
+  did not.
+- Evidence sheets under `output/evidence/` comparing baseline and LoRA output.
+
+### Fixed
+- `train-lora` OOMed twice before running. It now refuses to start while another process
+  holds GPU memory, and caches text encoder outputs so SDXL fits in 8 GB.
+
 ## 2.1.0 — 2026-08-04
 
 ### Added

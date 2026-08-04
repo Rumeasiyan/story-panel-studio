@@ -95,6 +95,29 @@ Panel volume with the 4-step LoRA:
 | 60 | 5 min | 20 min |
 | 120 | 10 min | 40 min |
 
+### Character LoRA training (Illustrious-XL, 8 GB)
+
+| Stage | Cost |
+|---|---|
+| Candidate generation, 74 images at 25 steps, 832x1216 | ~28 min |
+| Curation to 28 images | manual |
+| Training, 28 images x6 repeats x8 epochs = 1344 steps at 768px | **28 min** |
+| Inference with the LoRA | same as without (~15 s at 832x1216, 25 steps) |
+
+Roughly an hour of GPU time per character, paid once. Inference costs nothing extra.
+
+**The engine must be stopped first.** ComfyUI keeps weights resident and 8 GB will not
+hold both; `scripts/train-lora` refuses to start otherwise.
+
+**Text encoder output caching is mandatory at 8 GB**, which forces UNet-only training.
+Consequence: the trigger word carries no text-encoder association and means nothing on
+its own. Prompts must still describe the character in full — the LoRA shifts the face,
+the prompt still carries the identity.
+
+Lightning LoRAs are unsuitable for generating training data: at 8 steps they produced
+malformed faces that the negative prompt did not suppress. Training candidates were
+generated at 25 steps.
+
 ### Subtitles
 
 | model | audio | time |

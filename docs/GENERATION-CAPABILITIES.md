@@ -100,12 +100,29 @@ Adequate for one video; **not adequate for a serialised protagonist**. Plan for 
 **trained character LoRA per recurring character**: roughly 25 curated images, trained
 once, then free at inference via the `lora` parameter on any SDXL pipeline.
 
-**Training is available.** `./scripts/train-lora --name <char> --images <dir>` runs
-kohya-ss sd-scripts (pinned submodule, isolated venv) with settings tuned for 8 GB —
-gradient checkpointing, cached latents, 8-bit Adam, UNet-only. Defaults to 768px because
-SDXL at 1024 is the tightest this card accepts. Train against the same checkpoint the
-panels will use; `--base` takes the same ids as the `model` parameter. The character name
-becomes the trigger word and must appear in every prompt.
+**Training works and has been validated end to end.** One LoRA is trained
+(`kai.safetensors`) and measured against the baseline above:
+
+| | Prompt-only | With LoRA |
+|---|---|---|
+| Face reads as the same person | fails | ~17 of 20 |
+| Explicit scar tag rendered | 2 of 20 | 8 of 20 |
+| Hard rejects | 2 of 20 | 1 of 20 |
+
+`./scripts/train-lora --name <char> --images <dir>` runs kohya-ss sd-scripts (pinned
+submodule, isolated venv), tuned for 8 GB. Budget **roughly one hour of GPU time per
+character**: ~28 min generating candidates, curation, ~28 min training. Inference costs
+nothing extra.
+
+Three things the plan must account for:
+
+1. **The engine must be stopped during training.** ComfyUI holds weights resident and
+   8 GB will not carry both. No panels can be generated while a LoRA trains.
+2. **The trigger word alone does nothing.** 8 GB forces UNet-only training, so the
+   trigger has no text-encoder association. Prompts must still describe the character in
+   full — the LoRA shifts the face, the prompt carries the identity.
+3. **Small distinguishing marks are unreliable** (~40% for a facial scar). Do not make a
+   character recognisable by one small detail.
 
 Precursor task: generate a character sheet — one character, multiple angles and
 expressions — which doubles as the LoRA training set.

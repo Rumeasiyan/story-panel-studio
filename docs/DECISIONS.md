@@ -25,6 +25,30 @@ maintained.
 
 ---
 
+## 2026-08-04 — Character identity comes from a trained LoRA, not from prompting
+
+**Decision.** Recurring characters get a trained LoRA per character, produced by
+`scripts/train-lora`. Prompt-only consistency is not used for serialised protagonists.
+
+**Why.** Measured both. Twenty panels with an identical character tag block and a fixed
+seed produced faces that read as different people, and an explicit `scar on left cheek`
+tag was ignored in 18 of 20 panels. The same twenty scenes with a LoRA trained on 28
+curated images held the face across roughly 17 of 20 and raised the scar to 8 of 20.
+The alternatives were reference-based conditioning through `flux2-edit`, which pays an
+encoding cost on every panel and was untested at length, or accepting drift, which for
+a serialised protagonist means viewers see a different actor each episode. A LoRA costs
+about an hour of GPU time once and nothing at inference.
+
+**Consequences.** Every recurring character needs a character sheet and a training run
+before it can appear in a series. Fitting SDXL training into 8 GB forces
+`--cache_text_encoder_outputs`, which forces UNet-only training, which means the trigger
+word has no text-encoder association: prompts must still describe the character in full.
+The LoRA shifts the face; the prompt still carries the identity. The scar remains
+unreliable at roughly 40%, so small distinguishing marks should not be load-bearing in a
+character design without further curation.
+
+**Refs.** Issue #1, `scripts/train-lora`, `output/evidence/`, `reports/BENCHMARKS.md`.
+
 ## 2026-08-03 — Deleted the Wan video models from this machine
 
 **Decision.** Removed Wan 2.2 TI2V-5B and Wan 2.1 Fun-InP weights (22.79 GB), keeping
