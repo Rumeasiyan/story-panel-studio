@@ -74,3 +74,4 @@ cache/object-info.json
 .venv-parler/
 .venv-trainer/
 characters/_training/
+characters/*/images/

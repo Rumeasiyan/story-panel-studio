@@ -23,6 +23,7 @@ cached latents, an 8-bit optimiser and UNet-only training it will OOM.
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
 import subprocess
 import sys
@@ -113,9 +114,42 @@ def prepare_dataset(images: Path, name: str, repeats: int) -> Path:
     return staging
 
 
+def comfy_vram_holders() -> list[str]:
+    """ComfyUI keeps model weights resident, and 8 GB will not hold both it and a
+    training run. Report any process occupying the GPU so the failure is obvious
+    before an hour of setup rather than as an OOM traceback afterwards."""
+    if not shutil.which("nvidia-smi"):
+        return []
+    out = subprocess.run(
+        ["nvidia-smi", "--query-compute-apps=pid,used_memory,process_name",
+         "--format=csv,noheader"], capture_output=True, text=True).stdout.strip()
+    holders = []
+    for line in out.splitlines():
+        if not line.strip():
+            continue
+        used = line.split(",")[1].strip()
+        try:
+            mib = int(used.split()[0])
+        except (ValueError, IndexError):
+            continue
+        if mib > 300:            # ignore the desktop compositor
+            holders.append(line.strip())
+    return holders
+
+
 def train(args) -> int:
     if not check_environment(verbose=False):
         print(red("environment is not ready; run --check"))
+        return 1
+
+    holders = comfy_vram_holders()
+    if holders and not args.force:
+        print(red("GPU memory is already in use by:"))
+        for h in holders:
+            print(f"    {h}")
+        print("\nTraining SDXL needs nearly all 8 GB. Stop the engine first:")
+        print("    pkill -f 'engine/ComfyUI/main.py'    # or stop scripts/serve.sh")
+        print("Then re-run. Use --force to attempt it anyway.")
         return 1
 
     images = Path(args.images).resolve()
@@ -173,6 +207,12 @@ def train(args) -> int:
         "--gradient_checkpointing",
         "--cache_latents",
         "--cache_latents_to_disk",
+        # SDXL carries two text encoders and they stay resident even for UNet-only
+        # training. Caching their outputs lets them be unloaded, which is the single
+        # biggest saving available and the difference between fitting and not at 8 GB.
+        "--cache_text_encoder_outputs",
+        "--cache_text_encoder_outputs_to_disk",
+        "--full_bf16",
         "--optimizer_type=AdamW8bit",
         "--network_train_unet_only",
         "--max_data_loader_n_workers=1",
@@ -187,7 +227,11 @@ def train(args) -> int:
     ]
 
     print(yellow("  (first run also caches latents, which takes a few minutes)\n"))
-    result = subprocess.run(command, cwd=str(SD_SCRIPTS))
+    environment = dict(os.environ)
+    # Fragmentation is what actually kills this at 8 GB: the allocator ends up unable to
+    # find a contiguous block long before the card is genuinely full.
+    environment["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+    result = subprocess.run(command, cwd=str(SD_SCRIPTS), env=environment)
     if result.returncode != 0:
         print(red(f"\ntraining failed (exit {result.returncode})."))
         print("If it ran out of memory, drop --resolution to 768 or 512; SDXL at 1024 "
@@ -221,6 +265,8 @@ def main() -> int:
     parser.add_argument("--lr", default="1e-4")
     parser.add_argument("--xformers", action="store_true",
                         help="use xformers instead of sdpa attention")
+    parser.add_argument("--force", action="store_true",
+                        help="train even if another process is holding GPU memory")
     parser.add_argument("--check", action="store_true", help="verify the environment only")
     args = parser.parse_args()
 
