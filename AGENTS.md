@@ -37,6 +37,7 @@ environments are never committed; they are rebuilt from pinned manifests.
 | `reports/BENCHMARKS.md` | Measured timings on this exact machine. Use these, do not guess. |
 | `reports/MODEL_LICENSES.md` | Licence position per model, including the unresolved ones. |
 | `docs/DECISIONS.md` | Why things are the way they are. Read before reversing a decision. |
+| `docs/START-HERE.md` | Entry point for the consuming goal repo. Keep it true — it is what the orchestrator plans against. |
 | `workflows/` | Committed ComfyUI JSON, copied verbatim from official templates. |
 
 ## Constraints

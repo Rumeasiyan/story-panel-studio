@@ -5,6 +5,8 @@ subtitles and video. It **generates only** — an external app queues jobs, poll
 collects the files, and does assembly, thumbnails, SEO and upload.
 
 **[API.md](API.md) is the reference for callers.** Interactive docs at `/docs`.
+**[../docs/START-HERE.md](../docs/START-HERE.md)** is the orientation doc for the
+consuming project: capabilities, recipes, measured costs and constraints in one place.
 
 A small web console is served at `/`, built from the same API, for eyeballing results
 and trying parameters by hand.
