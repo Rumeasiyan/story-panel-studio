@@ -1,4 +1,4 @@
-# Model registry for ai-video-gen.
+# Model registry for story-panel-studio.
 #
 # Manifest-driven: new profiles are added here, not by restructuring the repository.
 # Every artifact pins an exact Hugging Face revision (commit SHA), never floating `main`.

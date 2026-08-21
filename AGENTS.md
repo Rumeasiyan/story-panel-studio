@@ -1,4 +1,4 @@
-# AGENTS.md — ai-video-gen
+# AGENTS.md — story-panel-studio
 
 Working guide for this repository. Read before touching anything.
 
@@ -101,7 +101,7 @@ There is no test suite and no linter config. Verification here is running the th
 | | |
 |---|---|
 | Canonical source | `VERSION` at the repository root |
-| Current version | `2.1.0` |
+| Current version | `2.3.0` |
 | Build number | none — this is not a packaged application |
 | Displayed at | `GET /api/status` and `/docs`, read via `config.VERSION` |
 

@@ -5,7 +5,7 @@ SHELL := /bin/bash
         models model-status repo-check snapshot update nodes serve serve-ui forget forget-all audit
 
 help: ## Show this help
-	@echo "ai-video-gen — available targets"
+	@echo "story-panel-studio — available targets"
 	@echo
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
 	  | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[1m%-16s\033[0m %s\n", $$1, $$2}'

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Idempotent setup for ai-video-gen. Safe to re-run.
+# Idempotent setup for story-panel-studio. Safe to re-run.
 #
 #   ./bootstrap.sh                      # full core setup (no large model downloads)
 #   ./bootstrap.sh --core-only          # identical, but never prepares model manifests
@@ -15,7 +15,7 @@ set -euo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 cd "$ROOT"
 
-EXPECTED_ROOT="$HOME/external/ai-video-gen"
+EXPECTED_ROOT="$HOME/external/story-panel-studio"
 COMFY_REPO="https://github.com/Comfy-Org/ComfyUI.git"
 
 CORE_ONLY=0
@@ -249,7 +249,7 @@ fi
 
 if (( NEEDS_WRITE )); then
   cat > config/extra_model_paths.yaml <<EOF
-# External model paths for ai-video-gen.
+# External model paths for story-panel-studio.
 #
 # Weights live ONCE under the project-root models/ directory. Nothing is copied or
 # symlinked into engine/ComfyUI/models, so the submodule stays clean and other engines

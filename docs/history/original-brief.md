@@ -7,14 +7,14 @@ Do not merely explain how to perform this setup. Inspect the machine, create the
 The intended project root is fixed:
 
 ```text
-~/external/ai-video-gen
+~/external/story-panel-studio
 ```
 
 I may have already run:
 
 ```bash
-mkdir -p ~/external/ai-video-gen
-cd ~/external/ai-video-gen
+mkdir -p ~/external/story-panel-studio
+cd ~/external/story-panel-studio
 git init
 claude
 ```
@@ -54,7 +54,7 @@ At the beginning:
 2. Confirm that the intended root is exactly:
 
    ```text
-   $HOME/external/ai-video-gen
+   $HOME/external/story-panel-studio
    ```
 
 3. When running elsewhere, do not scatter project files into the wrong folder. Change to or create the intended root.
@@ -104,7 +104,7 @@ Follow these rules throughout this task and persist them in `CLAUDE.md`.
 5. Use a project-local virtual environment at:
 
    ```text
-   ~/external/ai-video-gen/.venv
+   ~/external/story-panel-studio/.venv
    ```
 
 6. Do not install the full system CUDA Toolkit merely because PyTorch needs CUDA. Prefer official CUDA-enabled PyTorch wheels.
@@ -141,7 +141,7 @@ Follow these rules throughout this task and persist them in `CLAUDE.md`.
 Create and maintain this structure:
 
 ```text
-~/external/ai-video-gen/
+~/external/story-panel-studio/
 ├── .git/
 ├── .githooks/
 │   └── pre-commit
@@ -227,7 +227,7 @@ It must persist these project rules:
 
 ## Project identity
 
-- Project root: `~/external/ai-video-gen`
+- Project root: `~/external/story-panel-studio`
 - Fedora + Hyprland
 - RTX 3050, expected 8 GB VRAM
 - Repository is a reproducible recipe, not a model/output warehouse
@@ -581,7 +581,7 @@ Do not replace Fedora's default Python.
 Select an available interpreter and create:
 
 ```bash
-pythonX.Y -m venv "$HOME/external/ai-video-gen/.venv"
+pythonX.Y -m venv "$HOME/external/story-panel-studio/.venv"
 ```
 
 Then:
@@ -714,7 +714,7 @@ The configuration must expose root-level folders, including:
 
 ```yaml
 ai_video_gen:
-  base_path: /absolute/path/to/ai-video-gen
+  base_path: /absolute/path/to/story-panel-studio
   checkpoints: models/checkpoints
   diffusion_models: models/diffusion_models
   text_encoders: models/text_encoders
@@ -1275,7 +1275,7 @@ Create a user-focused `README.md` containing:
 ## Quick start
 
 ```bash
-cd ~/external/ai-video-gen
+cd ~/external/story-panel-studio
 ./bootstrap.sh --core-only
 ./scripts/doctor.sh
 ./scripts/comfy.sh image
@@ -1307,7 +1307,7 @@ http://127.0.0.1:8188
 
 ```bash
 git clone --recurse-submodules <repository-url>
-cd ai-video-gen
+cd story-panel-studio
 ./bootstrap.sh --core-only
 ./scripts/modelctl install <profile>
 ```
@@ -1441,7 +1441,7 @@ Do not add a GitHub remote unless I explicitly provide one.
 
 Core setup is complete when:
 
-1. Project root is `~/external/ai-video-gen`.
+1. Project root is `~/external/story-panel-studio`.
 2. `CLAUDE.md` exists.
 3. Repository safety rules exist and work.
 4. ComfyUI is a pinned submodule.
@@ -1464,7 +1464,7 @@ Core setup is complete when:
 
 Start by:
 
-1. verifying or entering `~/external/ai-video-gen`
+1. verifying or entering `~/external/story-panel-studio`
 2. initializing Git if needed
 3. creating `CLAUDE.md`
 4. performing the preflight inspection

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Launch ComfyUI for ai-video-gen, bound to localhost only.
+# Launch ComfyUI for story-panel-studio, bound to localhost only.
 #
 #   ./scripts/comfy.sh image     # normal VRAM mode, ~1 GiB reserved for the desktop
 #   ./scripts/comfy.sh lowvram   # low-VRAM mode, previews off

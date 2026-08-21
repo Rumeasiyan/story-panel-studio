@@ -3,6 +3,18 @@
 Notable changes per version. The version lives in `VERSION`; see AGENTS.md for when
 each part changes.
 
+## 2.3.0 — 2026-08-04
+
+### Changed
+- Renamed from `ai-video-gen` to **story-panel-studio**, on disk and on GitHub. The old
+  name described a category, not this project, and was invisible in search.
+- Published under **Apache-2.0**. The service talks to ComfyUI over HTTP and imports none
+  of its GPL code, so a permissive licence applies to this repository.
+- README rewritten for people arriving cold: what problem it solves, measured numbers
+  rather than claims, and the licensing and security caveats stated plainly.
+- The original bootstrap prompt moved to `docs/history/original-brief.md`; it is a record
+  of how the project started, not a description of what it is.
+
 ## 2.2.0 — 2026-08-04
 
 ### Added

@@ -1,7 +1,7 @@
 # Installation report
 
 - **Date:** 2026-08-01 (local time, Asia/Kolkata as configured on the workstation)
-- **Project root:** `/home/sshroot/external/ai-video-gen`
+- **Project root:** `/home/sshroot/external/story-panel-studio`
 - **Scope:** core setup. No model weights were downloaded.
 
 ---

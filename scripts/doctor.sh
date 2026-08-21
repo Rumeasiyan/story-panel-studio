@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Health check for ai-video-gen. Exits non-zero when a critical check FAILs.
+# Health check for story-panel-studio. Exits non-zero when a critical check FAILs.
 #
 #   ./scripts/doctor.sh
 
@@ -8,7 +8,7 @@ set -uo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 cd "$ROOT"
 
-EXPECTED_ROOT="$HOME/external/ai-video-gen"
+EXPECTED_ROOT="$HOME/external/story-panel-studio"
 
 RED=$'\033[0;31m'; YEL=$'\033[0;33m'; GRN=$'\033[0;32m'; BLD=$'\033[1m'; NC=$'\033[0m'
 [[ -t 1 ]] || { RED=""; YEL=""; GRN=""; BLD=""; NC=""; }

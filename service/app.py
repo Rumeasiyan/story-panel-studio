@@ -63,7 +63,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="ai-video-gen generation API",
+    title="story-panel-studio generation API",
     description=__doc__,
     version=VERSION,
     lifespan=lifespan,

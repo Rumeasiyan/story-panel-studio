@@ -1,4 +1,4 @@
-# External model paths for ai-video-gen.
+# External model paths for story-panel-studio.
 #
 # Weights live ONCE under the project-root models/ directory. Nothing is copied or
 # symlinked into engine/ComfyUI/models, so the submodule stays clean and other engines
@@ -11,7 +11,7 @@
 # with ./bootstrap.sh --repair if the project is moved to a different absolute path.
 
 ai_video_gen:
-  base_path: /home/sshroot/external/ai-video-gen
+  base_path: /home/sshroot/external/story-panel-studio
   is_default: true
 
   checkpoints: models/checkpoints/

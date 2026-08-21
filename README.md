@@ -1,197 +1,134 @@
-# ai-video-gen
+# story-panel-studio
 
-A local, reproducible AI image/video-generation workspace for an NVIDIA RTX 3050 (8 GB)
-workstation running Fedora Linux and Hyprland.
+**Self-hosted REST API for AI story-video assets — character-consistent panels, narration, and subtitles on a single 8 GB consumer GPU.**
 
-**This repository is a recipe, not a warehouse.** It stores code, configuration,
-workflows, prompts and pinned model manifests. Model weights, renders, inputs and
-caches are never committed — they are redownloaded from pinned Hugging Face revisions.
+Generate the pieces of a story video locally: illustrated panels with a recurring
+character who actually stays the same person, narration in English or Tamil, and
+word-timed subtitles. One HTTP API, no per-image cost, no data leaving the machine.
 
-Engine: [ComfyUI](https://github.com/Comfy-Org/ComfyUI), pinned as a Git submodule at
-`engine/ComfyUI`.
+Built and measured on an **NVIDIA RTX 3050 (8 GB)**. Every number below is measured on
+that card, not estimated.
+
+```bash
+git clone --recurse-submodules https://github.com/Rumeasiyan/story-panel-studio.git
+cd story-panel-studio && ./bootstrap.sh --core-only
+./scripts/modelctl install anime-sdxl
+./scripts/serve.sh                    # → http://127.0.0.1:8189
+```
 
 ---
 
-## Quick start
+## What problem this solves
 
-```bash
-cd ~/external/ai-video-gen
-./bootstrap.sh --core-only
-./scripts/doctor.sh
-./scripts/comfy.sh image
-```
+Making a story video from AI images means solving four things that general-purpose tools
+leave to you:
 
-Then open:
+| Problem | What this does |
+|---|---|
+| **The character changes face between panels** | Trains a character LoRA and holds identity across a sequence. Measured: prompt-only fails, a trained LoRA holds ~17 of 20. |
+| **Narration drifts between episodes** | Named voice profiles — register a narrator once, reference it forever. |
+| **Subtitles get rewritten by transcription errors** | Pass your script; speech recognition supplies only the timing, never the words. |
+| **Everything is a different tool** | One REST API, one queue, one job history. |
 
-```text
-http://127.0.0.1:8188
-```
+It **generates assets**. It does not assemble, schedule or publish — that is deliberate,
+so it can sit behind whatever orchestrator you already have.
 
-No model weights are downloaded by `bootstrap.sh`. Until a profile is installed, the
-server starts but cannot generate images.
+---
 
-## Install a model profile
+## Capabilities
 
-```bash
-./scripts/modelctl list
-./scripts/modelctl show anime-sdxl
-./scripts/modelctl install anime-sdxl
-./scripts/modelctl set anime-sdxl
-./scripts/modelctl verify anime-sdxl          # size check
-./scripts/modelctl verify anime-sdxl --hash   # full SHA-256, slow
-```
+| Pipeline | Produces |
+|---|---|
+| `sdxl-text-to-image` | Illustrated panels — anime/manhwa or photoreal |
+| `sdxl-image-to-image` | Redraw an existing panel |
+| `sdxl-inpaint` | Regenerate a masked region |
+| `flux2-text-to-image` | 4-step generation with strong prompt adherence |
+| `flux2-edit` | Instruction editing — "change the background to night" |
+| `z-image-text-to-image` | Fast few-step generation |
+| `tts-indic-parler` | Narration in 21 languages including Tamil |
+| `subtitles` | SRT, VTT and word-level JSON, aligned to your script |
+| `wan22-video` | Text/image to video (optional, heavy) |
 
-| Profile | Purpose | Download |
+Capabilities are discovered at runtime from `GET /api/pipelines`, so a caller reads the
+contract rather than hardcoding it.
+
+## Measured performance (RTX 3050, 8 GB)
+
+| Job | Time |
+|---|---|
+| Panel 1024×576, 4-step Lightning LoRA, batch of 4 | **5.0 s each** |
+| Panel 1024×576, 25 steps, no LoRA | 15.4 s |
+| FLUX.2 generate / instruction edit | 18 s / 21 s |
+| Narration, any script length | ~68 s |
+| Subtitles, script-aligned | ~4 s |
+| Character LoRA, end to end | ~1 h, once per character |
+
+480 panels — four 120-panel videos — is about **40 minutes** of GPU time.
+Full data in [`reports/BENCHMARKS.md`](reports/BENCHMARKS.md).
+
+---
+
+## Character consistency
+
+The hard part of serialised story video. Prompting the same description every time does
+not work: faces drift, and explicitly stated features get dropped.
+
+Measured over 20 panels with an identical character description:
+
+| | Prompt only | Trained LoRA |
 |---|---|---|
-| `anime-sdxl` | Anime/manhwa stills (Animagine XL 4.0 opt) | 6.94 GB |
-| `cinematic-sdxl` | Realistic/cinematic stills (RealVisXL V4.0) | 6.94 GB |
-| `wan22-ti2v-5b` | Wan 2.2 TI2V-5B video experiment | 18.14 GB |
-
-`modelctl install` reports the total size, checks free space, and asks for approval
-before any single file over 5 GB or any set over 10 GB. Downloads resume, land in
-`models/` (never in the submodule), and are size-verified before being moved into place.
-
-## Wan test
+| Reads as the same person | fails | ~17 of 20 |
+| Explicit facial scar rendered | 2 of 20 | 8 of 20 |
 
 ```bash
-./scripts/modelctl install wan22-ti2v-5b
-./scripts/comfy.sh wan
+pkill -f 'engine/ComfyUI/main.py'        # training needs the whole GPU
+./scripts/train-lora --name kai --images characters/kai/images --base illustrious
 ```
 
-Open `workflows/video/wan22/wan2.2_ti2v_5B_official.json` and start at **512x288,
-41 frames, batch 1, previews off**. Do not start at 720p on 8 GB. Record every run in
-`reports/BENCHMARKS.md`.
+Tuned to fit SDXL training into 8 GB — gradient checkpointing, cached latents, cached
+text-encoder outputs, 8-bit Adam, UNet-only. Evidence in `output/evidence/`.
 
-Wan 2.2 on this card is an experiment relying on ComfyUI native offloading plus 32 GB
-of system RAM. SDXL stills are the production priority.
+---
 
-## Rebuild on another Linux machine
+## Design
 
-```bash
-git clone --recurse-submodules <repository-url>
-cd ai-video-gen
-./bootstrap.sh --core-only
-./scripts/modelctl install <profile>
-```
+- **Reproducible, not a model warehouse.** Weights are never committed. Every model is
+  pinned to a commit SHA with its size, SHA-256 and licence in
+  [`config/model-profiles.yaml`](config/model-profiles.yaml); `modelctl` rebuilds the set.
+- **User input never becomes graph structure.** ComfyUI's `/prompt` executes arbitrary
+  node graphs, so pipelines fill typed fields into fixed templates. The engine binds to
+  loopback and the launcher refuses anything else.
+- **Complete deletion.** `forget-generation` removes outputs, uploads, thumbnails, the
+  database row, and the SQLite write-ahead log — with `--audit` to prove it.
+- **Isolated environments.** Models with conflicting pins (parler-tts, sd-scripts) run in
+  their own virtualenvs so they cannot break the image engine.
 
-`bootstrap.sh` is idempotent. It verifies the root, initializes Git and the submodule,
-installs missing Fedora packages, creates `.venv`, installs CUDA-enabled PyTorch,
-regenerates `config/extra_model_paths.yaml` with the new absolute path, runs the doctor,
-and performs a ComfyUI smoke test. It never touches the NVIDIA driver, Secure Boot,
-kernels, or Hyprland configuration.
+## Requirements
 
-## Repository layout
+NVIDIA GPU with 8 GB+ VRAM · 32 GB RAM recommended · Linux · Python 3.13 or 3.12 ·
+~50 GB disk for models. Developed on Fedora 43.
 
-```text
-config/     runtime.env, extra_model_paths.yaml, model-profiles.yaml, custom-nodes.yaml
-engine/     ComfyUI (pinned Git submodule)
-custom_nodes/  pinned third-party node submodules (empty by default)
-models/     shared weight store — gitignored
-workflows/  committed ComfyUI JSON
-prompts/    committed prompt library
-characters/ committed character metadata (no weights, no large image sets)
-scripts/    doctor, comfy, update, snapshot, repository-check, modelctl, custom-nodectl
-reports/    installation report, benchmarks, model licences
-input/ output/ temp/ cache/ logs/ user/   local runtime data — gitignored
-```
+## Documentation
 
-`make help` lists every wrapper target.
+| | |
+|---|---|
+| [`docs/START-HERE.md`](docs/START-HERE.md) | Orientation for an agent or integrator |
+| [`service/API.md`](service/API.md) | Full API reference |
+| [`AGENTS.md`](AGENTS.md) | Repo conventions and constraints |
+| [`docs/DECISIONS.md`](docs/DECISIONS.md) | Why things are the way they are |
+| [`reports/MODEL_LICENSES.md`](reports/MODEL_LICENSES.md) | Licence position per model |
 
-## Git policy
+## Licensing
 
-Committed:
+This project is **Apache-2.0** (see [LICENSE](LICENSE)). It talks to ComfyUI over HTTP
+and imports none of its code.
 
-- scripts, configuration, `Makefile`, `bootstrap.sh`
-- workflow JSON and the prompt library
-- character metadata and small licensed assets
-- reports (installation, benchmarks, licences)
-- the ComfyUI submodule **pointer** (an exact commit)
-
-Never committed:
-
-- model weights, LoRAs, VAEs, text encoders (`models/`)
-- renders and source media (`output/`, `input/`)
-- `.venv`, caches, logs, ComfyUI user state
-- secrets, tokens, `.env`
-
-Enforcement: `.gitignore`, a repo-local `pre-commit` hook (`git config core.hooksPath
-.githooks`, set by bootstrap — your global Git config is untouched), the manual
-`./scripts/repository-check.sh --all`, and a GitHub Actions workflow that rejects
-prohibited extensions and oversized files.
-
-Public models are redownloaded from pinned Hugging Face revisions, so nothing is lost by
-not committing them. Git LFS is **not** used for public weights. Private character LoRAs
-should eventually live in a private model registry, not in Git. No third-party hosting
-service offers unlimited free storage — do not plan around that.
-
-## Model switching
-
-`config/model-profiles.yaml` is a manifest: each profile lists artifacts with a
-repository, a **pinned commit**, an exact filename, a destination, a size, a SHA-256 and
-a licence. Adding a new checkpoint, a Wan version, a quantized variant or a LoRA pack
-means appending an entry — not restructuring the repository.
-
-`./scripts/modelctl set <profile>` writes `.active-model-profile` (local, gitignored).
-It changes script defaults and download targets.
-
-> **Limitation:** a ComfyUI workflow stores the exact model filename inside its loader
-> node. Switching profiles does not rewrite existing workflows. After switching, open
-> the workflow and reselect the checkpoint.
-
-## Custom nodes
-
-The core setup works with zero third-party nodes. `config/custom-nodes.yaml` starts
-empty. Add nodes one at a time, each pinned to a full commit SHA:
-
-```bash
-./scripts/custom-nodectl list
-./scripts/custom-nodectl install <id>
-./scripts/custom-nodectl verify
-```
-
-`custom-nodectl` refuses unpinned entries, backs up `requirements.lock.txt`, and warns
-before installing any dependency that would replace `torch`, `torchvision`,
-`torchaudio`, `triton`, or `nvidia-*` packages. IP-Adapter, ControlNet helpers and face
-tools are a later, explicitly approved stage.
-
-## Updating
-
-```bash
-./scripts/update.sh --check   # show upstream commits without changing anything
-./scripts/update.sh           # prompts before moving the pin
-```
-
-The pin never floats silently. After updating, the submodule pointer change is left
-staged for your review and commit.
+**Model weights carry their own licences, and some restrict commercial use.** They are
+recorded per model in [`reports/MODEL_LICENSES.md`](reports/MODEL_LICENSES.md). Check
+them before publishing generated output commercially.
 
 ## Security
 
-ComfyUI binds to `127.0.0.1:8188` only. `scripts/comfy.sh` refuses to start if
-`COMFY_HOST` is anything other than a loopback address. Port 8188 is never exposed
-publicly and no startup service is installed.
-
-To reach it from another machine, use an SSH tunnel:
-
-```bash
-ssh -L 8188:127.0.0.1:8188 USER@FEDORA_PC_LAN_IP
-```
-
-then browse to `http://127.0.0.1:8188` on the client. Do not configure public access.
-
-## Health check
-
-```bash
-./scripts/doctor.sh
-```
-
-Checks project root, Git state, submodule pin, `.venv`, Python version, pip, PyTorch and
-its CUDA runtime, `torch.cuda.is_available()`, RTX 3050 detection, VRAM, a live CUDA
-tensor operation, FFmpeg, free storage, YAML validity, model directories, the active
-profile, accidentally tracked forbidden files, port 8188, and the ComfyUI startup
-command. Exits non-zero on critical failures.
-
-## Licences
-
-Model licences and sources are recorded in `reports/MODEL_LICENSES.md`. Both SDXL
-checkpoints are CreativeML Open RAIL++-M and require a licence review before commercial
-use. Record the licence of every model and LoRA before production use.
+The API has **no authentication**. It is built for a trusted local network. Anything that
+can reach the port can queue GPU work and read or delete generated files. Do not expose
+it to the internet without putting authentication in front of it.
