@@ -25,6 +25,28 @@ maintained.
 
 ---
 
+## 2026-08-04 — Renamed to story-panel-studio and published under Apache-2.0
+
+**Decision.** Renamed from `ai-video-gen` on disk and on GitHub, licensed Apache-2.0,
+made public.
+
+**Why.** The old name described a category, not this project, and returned nothing
+useful in search. `story-panel-studio` names what it makes. Apache-2.0 rather than MIT
+for the explicit patent grant, and rather than a copyleft licence because the goal is
+adoption; it is also consistent with most of the pinned model weights. The copyleft in
+ComfyUI does not reach this repository — the service talks to it over HTTP and imports
+none of its code, which was verified before choosing.
+
+**Consequences.** Anything referring to the old path breaks, including the consuming
+goal repo, which was updated. **Python virtualenvs do not survive a directory rename**:
+`bin/activate`, `pyvenv.cfg` and every console-script shebang embed the absolute path, so
+all three venvs needed patching. `scripts/doctor.sh` did not catch it because it invokes
+`.venv/bin/python` by absolute path, while `scripts/comfy.sh` sources `activate` and got
+system Python with no torch. A rebuild via `./bootstrap.sh --repair` is the alternative
+to patching.
+
+**Refs.** `10a5b89`, `README.md`, `LICENSE`.
+
 ## 2026-08-04 — Character identity comes from a trained LoRA, not from prompting
 
 **Decision.** Recurring characters get a trained LoRA per character, produced by
