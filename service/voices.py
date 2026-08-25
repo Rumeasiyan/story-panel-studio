@@ -9,6 +9,12 @@ Two engines, one concept:
 
   indicf5        stores a reference clip plus its exact transcript, and clones it
   indic-parler   stores a speaker description, kept byte-identical between calls
+  chatterbox     stores a reference clip; needs no transcript
+  omnivoice      either a clip plus transcript, or 'instruct' tags in the description
+
+Two of these cannot be regenerated from their settings. OmniVoice's auto and design
+modes invent a speaker on every call, so once a voice is chosen the clip IS the voice
+— losing the file loses the narrator permanently.
 
 Profiles live in service/data/voices/ with a JSON manifest beside the audio, so they
 survive restarts and can be copied to another machine with the repository.
@@ -30,7 +36,7 @@ MANIFEST = VOICE_DIR / "voices.json"
 
 NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 
-ENGINES = ("indicf5", "indic-parler")
+ENGINES = ("indicf5", "indic-parler", "chatterbox", "omnivoice")
 
 
 class VoiceError(ValueError):
@@ -83,7 +89,26 @@ def register(name: str, engine: str, *, language: str = "ta",
     if engine not in ENGINES:
         raise VoiceError(f"engine must be one of: {', '.join(ENGINES)}")
 
-    if engine == "indicf5":
+    if engine == "chatterbox":
+        if reference_audio is None:
+            raise VoiceError(
+                "chatterbox clones a voice, so 'reference_audio' is required — about "
+                "ten seconds of clean speech. It needs no transcript."
+            )
+    elif engine == "omnivoice":
+        if reference_audio is None and not voice_description.strip():
+            raise VoiceError(
+                "omnivoice needs either 'reference_audio' plus 'reference_text' to "
+                "clone a speaker, or 'voice_description' holding instruct tags such "
+                "as 'male, young adult, low pitch'. Note that design and auto modes "
+                "pick a new speaker on every call, so only a stored clip repeats."
+            )
+        if reference_audio is not None and not reference_text.strip():
+            raise VoiceError(
+                "'reference_text' is required when cloning: the exact transcript of "
+                "the clip. A mismatch degrades the clone."
+            )
+    elif engine == "indicf5":
         if reference_audio is None:
             raise VoiceError(
                 "indicf5 clones a voice, so 'reference_audio' is required — a few "

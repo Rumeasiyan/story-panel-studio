@@ -3,6 +3,37 @@
 Notable changes per version. The version lives in `VERSION`; see AGENTS.md for when
 each part changes.
 
+## 2.4.0 — 2026-08-26
+
+### Added
+- Two narration pipelines, `tts-chatterbox` and `tts-omnivoice`, both reachable through
+  `POST /api/generate` like every other capability. Each runs as a subprocess worker in
+  its own virtualenv (`chatterbox_worker.py`, `omnivoice_worker.py`) because their torch
+  pins conflict with ComfyUI's and with each other.
+- **Segmented narration.** Both pipelines accept a `segments` JSON array; each beat is a
+  separate generation call with its own emotion, joined with per-beat pauses. This exists
+  because a whole script generated in one call comes out flat — every sentence at one
+  emotional setting — and long blocks were also being silently truncated when they
+  overran the sampler's step budget. Plain `text` still works and is chunked on sentence
+  boundaries.
+- `voices.py` now covers `chatterbox` and `omnivoice` alongside the Indic engines, with
+  the validation each needs: Chatterbox clones without a transcript, OmniVoice needs one
+  when cloning and accepts `instruct` tags otherwise.
+- `config/venv-locks/` — pip freezes plus rebuild instructions for the hand-built
+  virtualenvs, which previously had no rebuild path at all.
+- `docs/MODEL-CHOICES.md` — one table per job saying which model is used and why.
+
+### Changed
+- English narration is Chatterbox, not Indic Parler. Indic Parler is an Indic research
+  model; it was chosen when it was the only local Tamil option and then over-applied to
+  English, where it does not sound publishable. It stays registered for Tamil.
+
+### Notes
+- `instruct` is validated against OmniVoice's fixed tag vocabulary at request time, so a
+  bad tag fails with the list of valid ones instead of inside the worker.
+- OmniVoice exposes no emotion parameter. `speed` is the only prosody lever, so Tamil
+  beats are paced rather than acted — weaker than the English path, and unresolved.
+
 ## 2.3.0 — 2026-08-04
 
 ### Changed

@@ -26,6 +26,43 @@ Job status values: `queued`, `running`, `done`, `error`, `cancelled`.
 
 ---
 
+## Narration with per-beat emotion
+
+`tts-chatterbox` (English) and `tts-omnivoice` (646 languages, incl. Tamil) accept a
+`segments` array instead of plain `text`. Each entry is generated separately, so emotion
+can change between beats while the voice does not, and joined with per-entry pauses.
+
+```bash
+curl -X POST http://127.0.0.1:8189/api/generate \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "pipeline": "tts-chatterbox",
+    "segments": "[{\"text\": \"He arrived early, the way he had for eleven years.\", \"exaggeration\": 0.35, \"cfg_weight\": 0.30, \"pause_after\": 0.5}, {\"text\": \"They took it from him in ninety seconds.\", \"exaggeration\": 0.95, \"cfg_weight\": 0.45}]"
+  }'
+```
+
+`segments` is a JSON *string*, since parameters are typed scalars. Each entry needs
+`text`; the engine's controls and `pause_after` are optional and fall back to the
+request-level values. At most 64 entries.
+
+| Engine | Emotion control | Speaker |
+|---|---|---|
+| `tts-chatterbox` | `exaggeration` 0–2, `cfg_weight` 0–1 (lower = slower) | `reference_audio` or a registered `voice`. No transcript needed. |
+| `tts-omnivoice` | none — `speed` only | clone (`reference_audio` + `reference_text`), `instruct` tags, or auto |
+
+**Pin the speaker.** Without a reference clip every call invents a new voice, so a
+multi-segment narration drifts between beats. Register the narrator once via
+`POST /api/voices` and pass `voice`.
+
+OmniVoice's `instruct` is a fixed vocabulary — `male`, `female`, `teenager`,
+`young adult`, `middle-aged`, `elderly`, pitch levels, and accents — not free text. A
+bad tag is rejected at request time with the full list. Its auto and design modes pick a
+new speaker on every call, so only a stored clip repeats a voice.
+
+Plain `text` still works on both and is split on sentence boundaries.
+
+---
+
 ## Discovering capabilities
 
 ```http
