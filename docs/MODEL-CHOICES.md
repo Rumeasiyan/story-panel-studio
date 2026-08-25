@@ -29,11 +29,11 @@ Status: **live** = wired into the API · **local** = installed, not yet a pipeli
 
 | Job | Model | Why | Licence | Status |
 |---|---|---|---|---|
-| **English narration** | **Chatterbox** (Resemble AI) | The one that sounded human. Zero-shot cloning from ~5s; `exaggeration` + `cfg_weight` give per-beat emotion | MIT | local — not yet a pipeline |
-| Tamil narration | *unsolved* | Chatterbox has no Tamil | — | — |
+| **English narration** | **Chatterbox** (Resemble AI) | The one that sounded human. Zero-shot cloning from ~5s; `exaggeration` + `cfg_weight` give per-beat emotion | MIT | **live** — `tts-chatterbox` |
+| Tamil narration | **k2-fsa/OmniVoice** | 423h Tamil training data; cross-lingual cloning | Apache-2.0 | **live** — `tts-omnivoice` |
 | Sinhala narration | *unsolved* | See below | — | — |
 | Tamil / Indic, current fallback | Indic Parler-TTS | Only local Tamil option found; 21 languages, 12 emotions | Apache-2.0 | live — **English quality rejected** |
-| Multilingual candidate | **k2-fsa/OmniVoice** | 646 languages incl. Tamil (423h) and Sinhala (12h); zero-shot cloning | Apache-2.0 | candidate |
+| Multilingual candidate | **k2-fsa/OmniVoice** | 646 languages incl. Tamil (423h) and Sinhala (12h); zero-shot cloning | Apache-2.0 | **live** — `tts-omnivoice` |
 | — its GUI wrapper | ~~omnivoice-studio~~ | **Do not use.** FSL-1.1-ALv2 forbids commercial use for 2 years | FSL-1.1-ALv2 | rejected |
 | Indic, unavailable | IndicF5 | Will not load; upstream-blocked (issue #2) | — | rejected |
 

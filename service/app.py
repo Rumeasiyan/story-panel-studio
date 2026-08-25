@@ -163,6 +163,9 @@ async def status():
         gpu = {"name": device.get("name"), "vram_total": device.get("vram_total"),
                "vram_free": device.get("vram_free")}
     return {
+        # AGENTS.md documents the version as visible here; it was only ever in the
+        # OpenAPI schema, so a caller checking compatibility could not see it.
+        "version": VERSION,
         "comfy_up": stats is not None,
         "comfy_version": (stats or {}).get("system", {}).get("comfyui_version"),
         "gpu": gpu,
