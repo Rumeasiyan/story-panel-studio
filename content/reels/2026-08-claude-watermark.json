@@ -1,0 +1,50 @@
+{
+  "slug": "claude-watermark",
+  "title": "Claude now watermarks every word",
+  "target_seconds": 38,
+  "anchor": "assets/voices/reel-narrator-v1.wav",
+  "beats": [
+    {
+      "id": "hook",
+      "text": "Okay, every new Claude model watermarks every single word it writes. And you'll never see it.",
+      "exaggeration": 0.70, "cfg_weight": 0.45, "pause_after": 0.30,
+      "onscreen": "CLAUDE IS WATERMARKING\nEVERY WORD",
+      "visual": "hard cut to phone screen, cursor typing, text glitches once"
+    },
+    {
+      "id": "stakes",
+      "text": "It's not a symbol. It's not some tag in the metadata. It's hidden inside the actual word choices.",
+      "exaggeration": 0.55, "cfg_weight": 0.40, "pause_after": 0.35,
+      "onscreen": "not metadata.\ninside the words.",
+      "visual": "three fake overlays (emoji / tag / file info) each stamped WRONG"
+    },
+    {
+      "id": "mechanism",
+      "text": "So when Claude picks between grey and overcast, both work, right? Anthropic rigged that coin flip with a secret key. Do that a thousand times and a pattern shows up. You can't see it. They can prove it.",
+      "exaggeration": 0.40, "cfg_weight": 0.35, "pause_after": 0.45,
+      "onscreen": "\"grey\" or \"overcast\"?\n→ rigged coin flip\n→ 1000 flips = signature",
+      "visual": "two words on screen, coin flip loop, then a waveform of highlighted words"
+    },
+    {
+      "id": "twist",
+      "text": "But here's the part nobody's talking about. It can't prove who wrote something. It just proves Claude touched it.",
+      "exaggeration": 0.65, "cfg_weight": 0.38, "pause_after": 0.40,
+      "onscreen": "it does NOT prove\nauthorship",
+      "visual": "record scratch freeze, zoom in on text"
+    },
+    {
+      "id": "consequence",
+      "text": "So you wrote your own essay, asked Claude to fix the grammar? Same flag as if it wrote the whole thing.",
+      "exaggeration": 0.85, "cfg_weight": 0.42, "pause_after": 0.50,
+      "onscreen": "your essay + grammar fix\n=\nsame flag",
+      "visual": "essay doc, red flag stamp slams down"
+    },
+    {
+      "id": "cta",
+      "text": "It's live now, it's the E U A I Act, and a detection A P I is coming. Follow. One A I shift a day.",
+      "exaggeration": 0.60, "cfg_weight": 0.42, "pause_after": 0.0,
+      "onscreen": "EU AI Act Art. 50\ndetection API soon\n\nFOLLOW → 1 AI shift/day",
+      "visual": "clean end card, handle bottom third"
+    }
+  ]
+}
