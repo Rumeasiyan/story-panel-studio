@@ -3,6 +3,15 @@
 Notable changes per version. The version lives in `VERSION`; see AGENTS.md for when
 each part changes.
 
+## 3.0.2 — 2026-08-26
+
+### Fixed
+- `faster-whisper` was missing from `requirements-project.txt`, so a clean
+  `bootstrap.sh` produced a `subtitles` pipeline that accepted jobs and then failed with
+  `ModuleNotFoundError`. It only ever worked because the original `.venv` had it
+  installed by hand. Surfaced by wiping the environment and rebuilding. `soundfile` added
+  for the same reason.
+
 ## 3.0.1 — 2026-08-26
 
 ### Fixed
