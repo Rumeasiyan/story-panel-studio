@@ -1,0 +1,111 @@
+#!/usr/bin/env python3
+"""preview-episode — cut a watchable episode from generated assets.
+
+**This is a verification tool, not a product path.** AGENTS.md puts assembly in the
+orchestrator, and that boundary stands: nothing here is registered as a pipeline or
+reachable from the API. It exists because "verify by running" means watching the
+output, and a folder of PNGs and WAVs cannot be watched.
+
+Everything it works around is documented in docs/START-HERE.md under "Assembly notes
+for the orchestrator". Read that before writing the real assembler; each item below
+cost a debugging round here.
+
+    ./scripts/preview-episode en
+    ./scripts/preview-episode ta
+
+Expects output/e2e/ to hold panel-*.png, narration-<lang>.wav and subs-<lang>.srt,
+and content/stories/<slug>.json for the beat count.
+"""
+import subprocess, sys
+from pathlib import Path
+import soundfile as sf
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _subtitle_render import render, parse_srt
+
+E = Path("output/e2e")
+lang = sys.argv[1]
+panels = sorted(E.glob("panel-*.png"))
+audio, srt = E / f"narration-{lang}.wav", E / f"subs-{lang}.srt"
+out = E / f"episode-{lang}.mp4"
+
+dur = len(sf.read(audio)[0]) / sf.read(audio)[1]
+cues = parse_srt(srt)
+
+# Panels are placed on BEAT boundaries, not subtitle cues. Cue counts differ per
+# language (22 en / 30 ta / 23 si for the same story), so indexing evenly into cues
+# drifts away from the narration structure — it happened to land near the beats in
+# English and did not in Tamil, which is what produced the gaps.
+#
+# The beats are recoverable from the audio itself: the assembler inserts a pause after
+# each beat, so the longest silences ARE the beat boundaries.
+import re as _re, json as _json
+story = _json.loads(Path("content/stories/the-clause.json").read_text())
+n_beats = len(story["beats"])
+sd = subprocess.run(["ffmpeg","-hide_banner","-i",str(audio),
+                     "-af","silencedetect=noise=-40dB:d=0.28","-f","null","-"],
+                    capture_output=True, text=True).stderr
+sil = []
+for m in _re.finditer(r"silence_start: ([\d.]+)[\s\S]*?silence_end: ([\d.]+)", sd):
+    a_, b_ = float(m.group(1)), float(m.group(2))
+    if b_ - a_ >= 0.28:
+        sil.append((b_ - a_, (a_ + b_) / 2))
+sil.sort(reverse=True)
+bounds = sorted(m for _, m in sil[:n_beats - 1])
+beat_edges = [0.0] + bounds + [dur]
+if len(beat_edges) != n_beats + 1:                       # fall back to even spacing
+    beat_edges = [i * dur / n_beats for i in range(n_beats + 1)] + []
+    beat_edges = beat_edges[:n_beats] + [dur]
+
+per = len(panels) // n_beats                             # panels per beat
+starts = []
+for b in range(n_beats):
+    s0, s1 = beat_edges[b], beat_edges[b + 1]
+    for k in range(per):
+        starts.append(s0 + (s1 - s0) * k / per)
+while len(starts) < len(panels):
+    starts.append(dur - 0.5)
+starts = starts[:len(panels)]
+starts[0] = 0.0
+ends = starts[1:] + [dur]
+pan_list = E / f"_pan-{lang}.txt"
+pan_list.write_text("\n".join(
+    [f"file '{p.resolve()}'\nduration {max(0.8, e-s):.3f}" for p, s, e in zip(panels, starts, ends)]
+    + [f"file '{panels[-1].resolve()}'"]))
+
+# subtitle track: cue images with transparent frames filling the gaps
+imgs = render(lang, srt, f"/tmp/subs-{lang}")
+blank = Path(f"/tmp/subs-{lang}/_blank.png")
+if not blank.exists():
+    from PIL import Image
+    Image.new("RGBA", (1080, 1920), (0, 0, 0, 0)).save(blank)
+lines, t = [], 0.0
+for p, s, e in imgs:
+    if s > t:
+        lines += [f"file '{blank.resolve()}'", f"duration {s-t:.3f}"]
+    lines += [f"file '{p.resolve()}'", f"duration {max(0.2, e-s):.3f}"]
+    t = e
+if dur > t:
+    lines += [f"file '{blank.resolve()}'", f"duration {dur-t:.3f}"]
+lines.append(f"file '{blank.resolve()}'")
+sub_list = E / f"_sub-{lang}.txt"
+sub_list.write_text("\n".join(lines))
+
+fc = ("[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,"
+      "pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black,format=rgba[bg];"
+      "[bg][1:v]overlay=0:0:format=auto,format=yuv420p[v]")
+af = "loudnorm=I=-16:TP=-1.5:LRA=11"
+
+for target, vcodec, acodec, extra in (
+        (out, ["-c:v","libx264","-preset","medium","-crf","20","-movflags","+faststart"],
+         ["-c:a","aac","-b:a","192k"], []),
+        (out.with_suffix(".webm"), ["-c:v","libvpx-vp9","-b:v","1M","-row-mt","1"],
+         ["-c:a","libopus","-b:a","128k"], [])):
+    subprocess.run(["ffmpeg","-y","-loglevel","error",
+        "-f","concat","-safe","0","-i",str(pan_list),
+        "-f","concat","-safe","0","-i",str(sub_list),
+        "-i",str(audio),
+        "-filter_complex",fc,"-map","[v]","-map","2:a","-af",af,
+        "-r","30"] + vcodec + acodec + ["-ar","48000","-ac","2","-shortest",str(target)],
+        check=True)
+pan_list.unlink(); sub_list.unlink()
+print(f"  episode-{lang}  {dur:.1f}s  {len(panels)} panels  {len(imgs)} cues")

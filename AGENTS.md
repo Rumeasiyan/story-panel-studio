@@ -122,6 +122,7 @@ Models and assets:
 ./scripts/custom-nodectl list|verify|install <id>
 ./scripts/forget-generation <job-id>|--all|--audit
 ./scripts/workflow-to-api IN -o OUT   # UI workflow -> API schema, needs ComfyUI running
+./scripts/preview-episode en|ta|si    # cut a watchable episode from output/e2e/ to check sync
 ```
 
 There is no test suite and no linter config. Verification here is running the thing:

@@ -266,6 +266,10 @@ break a naive `ffmpeg` invocation, all of them found by actually cutting an epis
 | The **same story runs different lengths** per language — 41.4s en / 59.7s ta / 50.8s si | Panel counts and pacing are per-language decisions, not one timeline reused. |
 | Panels are **16:9**; Reels/Shorts are 9:16 | Letterboxing leaves roughly half the frame black. Generate at 9:16, or fill with a blurred background. |
 
+`./scripts/preview-episode <lang>` in this repo cuts a preview so the sync can be
+checked; it is a verification tool, not a product path, and the real assembler belongs
+to you.
+
 Measured end-to-end cost for one episode — 16 panels, narration in three languages,
 subtitles: **10.6 min** (panels 403s, narration 174s, subtitles 57s), peak VRAM under
 1 GB.
