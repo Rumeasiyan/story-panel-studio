@@ -38,12 +38,22 @@ image:
       Better and faster than RealVis on the same prompt (18s vs 24s) and Apache-2.0.
       Not for character work — this pipeline has no LoRA support, and character
       consistency runs on LoRAs, which need SDXL.
-  editing:
+  editing_global:
     pipeline: flux2-edit              # FLUX.2 klein 4B
-    verified: >-
-      Wardrobe swap held face, pose, background and rain exactly
-      (output/compare/edit-2-clothing.png); night-to-day held the character
-      (edit-1-daytime.png).
+    use_for: wardrobe, weather, time of day, palette — changes applied to the whole frame
+    verified: wardrobe, weather and time-of-day edits all held the source composition
+    cannot: >-
+      targeted removal or addition, and identity transfer between two images. Verified
+      across denoise 0.5/0.65/0.8/1.0 — it either changes nothing or regenerates the
+      whole frame. Use editing_regional instead. See docs/EDITING.md.
+  editing_regional:
+    pipeline: sdxl-inpaint
+    use_for: remove, add or replace something in one region of a panel
+    settings: {steps: 30, grow_mask_by: 24}
+    note: >-
+      Prompt what should be there afterwards, not what to remove. Match `model` to the
+      panel — anime for anime panels, cinematic for photoreal. Everything outside the
+      mask returns bit-identical.
 
 video:
   status: out of scope

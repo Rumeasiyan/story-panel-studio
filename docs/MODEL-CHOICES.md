@@ -13,7 +13,8 @@ Pins and hashes: `config/model-profiles.yaml`. Reference output: `output/compare
 | Character consistency | LoRA, `./scripts/train-lora --base illustrious` | — | — |
 | Fast drafts | `lora=sdxl_lightning_4step_lora.safetensors`, 4 steps, cfg 1.5, euler/sgm_uniform | — | CreativeML Open RAIL++-M |
 | Establishing shots, no recurring character | `flux2-text-to-image` — FLUX.2 klein 4B | prose | Apache-2.0 |
-| Image editing | `flux2-edit` — FLUX.2 klein 4B | prose | Apache-2.0 |
+| Image editing — **global restyle** | `flux2-edit` — FLUX.2 klein 4B | prose | Apache-2.0 |
+| Image editing — **regional** (remove/add/replace) | `sdxl-inpaint` + mask | see `docs/EDITING.md` | as checkpoint |
 
 ## Video
 
