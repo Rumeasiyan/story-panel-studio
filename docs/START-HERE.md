@@ -63,6 +63,7 @@ Record those, not your request — that is what reproduces the panel exactly.
 |---|---|
 | Full API reference | `service/API.md` |
 | Which model to use for what | `docs/MODEL-CHOICES.md` |
+| **How to edit an image — pick the tool by the shape of the change** | `docs/EDITING.md` |
 | Narration engine and anchor per language — **locked, do not substitute** | `config/generation-locks.yaml` |
 | Interactive API docs | `http://localhost:8189/docs` |
 | Measured timings — never estimate | `reports/BENCHMARKS.md` |
@@ -82,7 +83,8 @@ Record those, not your request — that is what reproduces the panel exactly.
 | `sdxl-image-to-image` | image | `prompt` | `image` |
 | `sdxl-inpaint` | image | `prompt` | `image`, `mask` |
 | `flux2-text-to-image` | image | `prompt` | — |
-| `flux2-edit` | image | `prompt` | `image`, `reference_2..4` |
+| `flux2-edit` | image | `prompt` | `image`, `reference_2..4` — **global restyle only, no regional edits** |
+| `sdxl-inpaint` | image | `prompt` | `image`, `mask` — **the only regional editor** |
 | `z-image-text-to-image` | image | `prompt` | — |
 | `tts-chatterbox` | audio | `text` or `segments` | `reference_audio` — **English** |
 | `tts-omnivoice` | audio | `text` or `segments` | `reference_audio` — **Tamil, Sinhala** |

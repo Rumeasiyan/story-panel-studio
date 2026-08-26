@@ -45,7 +45,8 @@ def _sample_and_save(graph: dict, p: dict, latent: list, conditioning: list) -> 
             "negative": ["6", 0],
             "latent_image": latent,
             "seed": p["seed"], "steps": p["steps"], "cfg": p["cfg"],
-            "sampler_name": "euler", "scheduler": "simple", "denoise": 1.0,
+            "sampler_name": "euler", "scheduler": "simple",
+            "denoise": p.get("denoise", 1.0),
         },
     }
     graph["11"] = {"class_type": "VAEDecode",
@@ -92,7 +93,10 @@ def build_edit(p: dict, files: dict[str, str]) -> dict:
     if not refs:
         raise ValueError("editing needs at least an 'image' file")
 
-    # Chain the references into the conditioning.
+    # Chain the references into the conditioning. Order matters: each ReferenceLatent
+    # wraps the previous conditioning, so the LAST one applied has the strongest pull.
+    # "image" is encoded first (node 31) and is also what seeds the sampler latent, so
+    # extra references act as context on top of it rather than replacing it.
     graph["30"] = {
         "class_type": "ReferenceLatent",
         "inputs": {"conditioning": ["5", 0], "latent": ["31", 0]},
@@ -113,7 +117,13 @@ def build_edit(p: dict, files: dict[str, str]) -> dict:
         conditioning = [ref_node, 0]
 
     # Output size follows the edited image unless the caller overrides it.
-    if p.get("width") and p.get("height"):
+    #
+    # An empty latent throws the source away. That is fine at denoise 1.0, where the
+    # result is regenerated from the conditioning anyway, but it makes a partial-denoise
+    # edit impossible — and partial denoise is the only way to say "change this, keep
+    # the rest". Below 1.0 the source latent always wins over an explicit size.
+    partial = float(p.get("denoise", 1.0)) < 1.0
+    if p.get("width") and p.get("height") and not partial:
         graph["7"] = {"class_type": "EmptyLatentImage",
                       "inputs": {"width": p["width"], "height": p["height"],
                                  "batch_size": p["batch_size"]}}
@@ -146,6 +156,14 @@ register(ComfyPipeline(
     build=build_text_to_image,
 ))
 
+EDIT_ONLY = [
+    Param("denoise", "float", default=1.0, minimum=0.1, maximum=1.0,
+          help="How much of the source to discard. 1.0 regenerates from the "
+               "instruction and keeps nothing structurally — right for a full restyle, "
+               "wrong for 'remove this person, keep the room'. Try 0.5-0.8 for edits "
+               "that must preserve the original composition."),
+]
+
 register(ComfyPipeline(
     id="flux2-edit",
     kind="image",
@@ -155,9 +173,10 @@ register(ComfyPipeline(
                 "so a character sheet can be supplied as context for consistency.",
     requires_profile="flux2-klein-4b",
     accepts_files=["image", "reference_2", "reference_3", "reference_4"],
-    params=COMMON + [
+    params=COMMON + EDIT_ONLY + [
         Param("width", "int", default=None, minimum=256, maximum=2048, snap=snap16,
-              help="Omit to keep the source image's size."),
+              help="Omit to keep the source image's size. Ignored when denoise < 1, "
+                   "since a partial edit must start from the source latent."),
         Param("height", "int", default=None, minimum=256, maximum=2048, snap=snap16),
     ],
     build=build_edit,

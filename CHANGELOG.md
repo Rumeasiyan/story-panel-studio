@@ -3,6 +3,32 @@
 Notable changes per version. The version lives in `VERSION`; see AGENTS.md for when
 each part changes.
 
+## 3.1.0 — 2026-08-26
+
+### Added
+- `denoise` on `flux2-edit`. It was hardcoded to 1.0 and unreachable, which made a
+  composition-preserving edit impossible at any setting. Below 1.0 the source latent
+  seeds the sampler and `width`/`height` are ignored, because a partial edit that starts
+  from an empty latent is not an edit.
+- `docs/EDITING.md` — which tool for which shape of change, with the failures recorded
+  so they are not retried. Referenced from `START-HERE.md`.
+
+### Changed
+- `editing` in `config/generation-locks.yaml` splits into `editing_global` (`flux2-edit`)
+  and `editing_regional` (`sdxl-inpaint`). Locking `flux2-edit` as "image editing" was an
+  overpromise: it is an instruction model with no spatial targeting.
+
+### Notes
+- `flux2-edit` cannot do targeted removal or identity transfer. Verified across denoise
+  0.5/0.65/0.8/1.0: it either changes nothing (≤0.8, output 1.4% different from source)
+  or regenerates the whole frame (1.0). `reference_2..4` chain style and context
+  conditioning, not identity — every merge attempt returned the second image unchanged.
+- `sdxl-inpaint` does the regional work and was previously untested. Removing two people
+  from a boardroom shot produced coherent empty chairs with the unmasked region
+  bit-identical. `grow_mask_by=24` — at 6 a leftover arm survived at the mask seam.
+- No local model does one-shot compositional editing on 8 GB: Qwen-Image-Edit is 20B,
+  FLUX.1 Kontext 12B, FLUX.2-dev 32B.
+
 ## 3.0.3 — 2026-08-26
 
 ### Fixed
