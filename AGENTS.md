@@ -68,6 +68,7 @@ Each of these has already caused, or nearly caused, a real failure here.
 | Anime panels | `sdxl-text-to-image`, `model=anime` (Illustrious-XL v2.0, **booru tags**) |
 | Cinematic panels | `sdxl-text-to-image`, `model=cinematic` (RealVisXL V4, prose) |
 | Character consistency | LoRA via `./scripts/train-lora --base illustrious` |
+| Establishing shots, no character | `flux2-text-to-image` |
 | Image editing | `flux2-edit` |
 | Video | **out of scope** — no weights installed, do not download |
 

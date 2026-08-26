@@ -25,8 +25,19 @@ image:
     lora: sdxl_lightning_4step_lora.safetensors
     settings: {steps: 4, cfg: 1.5, sampler: euler, scheduler: sgm_uniform}
     use_for: candidate batches only — at batch 1 it is 24s -> 15s for real quality loss
+  establishing_shots:
+    pipeline: flux2-text-to-image     # FLUX.2 klein 4B
+    use_for: cinematic shots with NO recurring character
+    why: >-
+      Better and faster than RealVis on the same prompt (18s vs 24s) and Apache-2.0.
+      Not for character work — this pipeline has no LoRA support, and character
+      consistency runs on LoRAs, which need SDXL.
   editing:
-    pipeline: flux2-edit             # FLUX.2 klein 4B, only option
+    pipeline: flux2-edit              # FLUX.2 klein 4B
+    verified: >-
+      Wardrobe swap held face, pose, background and rain exactly
+      (output/compare/edit-2-clothing.png); night-to-day held the character
+      (edit-1-daytime.png).
 
 video:
   status: out of scope

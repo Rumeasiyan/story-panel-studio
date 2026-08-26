@@ -3,6 +3,24 @@
 Notable changes per version. The version lives in `VERSION`; see AGENTS.md for when
 each part changes.
 
+## 3.0.1 — 2026-08-26
+
+### Fixed
+- `flux2-edit` was locked as the image-editing choice without ever being run — "the only
+  option" is not the same as "works", as Z-Image had just demonstrated. Verified: a
+  wardrobe swap held face, pose, background and rain exactly, and a night-to-day edit
+  held the character. Samples in `output/compare/`.
+- `wan22-video` now says OUT OF SCOPE in its own description, so an agent reading
+  `/api/pipelines` does not plan around it. It stays registered as an escape hatch and
+  fails with an actionable message naming the install command.
+
+### Changed
+- `flux2-text-to-image` given a defined job: cinematic establishing shots with no
+  recurring character. It beat RealVis on the same prompt (18s vs 24s) and is
+  Apache-2.0, but it has no LoRA support and character consistency runs on LoRAs, so
+  character work stays on SDXL. Previously it was registered but unlocked, which is the
+  state that caused models to be picked at random in the first place.
+
 ## 3.0.0 — 2026-08-26
 
 ### Breaking
