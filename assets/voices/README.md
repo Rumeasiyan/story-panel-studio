@@ -5,7 +5,22 @@ they define voice identity, which no generation parameter can change.
 
 Not committed — these are renders. Rebuild with the recipe below.
 
+## en-narrator-locked.wav
+
+**The locked English narrator** — see `config/voice-locks.yaml`. An 8s trim of the
+calm-authoritative sample with **no formant shift**, driven per-beat by Chatterbox's
+`exaggeration` and `cfg_weight`.
+
+```bash
+ffmpeg -y -i output/voice-samples-chatterbox/en-calm-authoritative.wav \
+  -t 8 -ar 24000 -ac 1 assets/voices/en-narrator-locked.wav
+```
+
 ## reel-narrator-v1.wav
+
+Superseded by `en-narrator-locked.wav`; kept because earlier reels were made with it.
+The +4% shift changes timbre, so swapping the two changes the narrator.
+
 
 English reel narrator. Chatterbox stock speaker, formants shifted up 4% so the
 voice reads younger. Resampling shifts pitch and formants together; formants track

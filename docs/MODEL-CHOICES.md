@@ -37,7 +37,24 @@ Status: **live** = wired into the API · **local** = installed, not yet a pipeli
 | — its GUI wrapper | ~~omnivoice-studio~~ | **Do not use.** FSL-1.1-ALv2 forbids commercial use for 2 years | FSL-1.1-ALv2 | rejected |
 | Indic, unavailable | IndicF5 | Will not load; upstream-blocked (issue #2) | — | rejected |
 
-### English voice — what was actually chosen
+## Locked narration defaults
+
+Chosen by listening. `config/voice-locks.yaml` is the machine-readable source; use it
+rather than picking an engine from a description.
+
+| Language | Pipeline | Anchor | Emotion | Reference output |
+|---|---|---|---|---|
+| English | `tts-chatterbox` | `assets/voices/en-narrator-locked.wav` | per-beat, real | `output/voice-lock/00-english-emotive-locked.wav` |
+| Tamil | `tts-omnivoice` | `assets/voices/tamil/a01-auto.wav` | pacing only | `output/voice-lock/02-tamil-omnivoice-a01.wav` |
+| Sinhala | `tts-omnivoice` | `assets/voices/tamil/a01-auto.wav` | pacing only | `output/voice-lock/03-sinhala-omnivoice-a01.wav` |
+
+The English anchor is the **unshifted** 8s trim of `en-calm-authoritative.wav`. It is
+not `reel-narrator-v1.wav`, which is the +4% formant variant — a different voice, kept
+only because earlier reels were made with it.
+
+Tamil and Sinhala share one anchor deliberately, so both channels are the same narrator.
+
+### English voice — earlier +4% experiment
 
 **Voice identity comes only from the reference clip.** No parameter changes age or
 timbre; `exaggeration`/`cfg_weight` only change delivery.
