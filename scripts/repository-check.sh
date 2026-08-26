@@ -27,6 +27,10 @@ ok()   { printf '%sOK%s   %s\n' "$GRN" "$NC" "$1"; }
 # Extensions that must never be committed.
 WEIGHT_EXT_RE='\.(safetensors|ckpt|pt|pth|bin|onnx|gguf|engine)$'
 MEDIA_EXT_RE='\.(mp4|mov|mkv|webm|avi|wav|flac|mp3|aac|psd|xcf|blend|exr)$'
+# The locked voice anchors are the one deliberate exception: 4.2 MB total, and
+# OmniVoice's auto mode invents a new speaker per call, so nothing regenerates them.
+# Ignoring them left a fresh clone unable to reproduce its own locked narration.
+MEDIA_ALLOW_RE='^assets/voices/locked/[^/]+\.wav$'
 SECRET_RE='(^|/)(\.env(\..*)?|.*\.(token|key|pem)|id_rsa|id_ed25519|credentials\.json)$'
 SECRET_ALLOW_RE='(^|/)\.env\.example$'
 IGNORED_DIR_RE='^(models|input|output|temp|cache|user)/'
@@ -52,7 +56,7 @@ check_list() {
       fail "$label: model weight file: $f"
       continue
     fi
-    if [[ "$f" =~ $MEDIA_EXT_RE ]]; then
+    if [[ "$f" =~ $MEDIA_EXT_RE ]] && ! [[ "$f" =~ $MEDIA_ALLOW_RE ]]; then
       fail "$label: generated/large media file: $f"
       continue
     fi
