@@ -3,6 +3,24 @@
 Notable changes per version. The version lives in `VERSION`; see AGENTS.md for when
 each part changes.
 
+## 3.0.3 — 2026-08-26
+
+### Fixed
+- The locked voice anchors are now committed. They were gitignored as renders, which
+  meant a fresh clone could not reproduce the repository's own locked narration —
+  `a01-auto.wav` is the Tamil and Sinhala narrator and OmniVoice's auto mode cannot
+  regenerate it. 4.2 MB total. `.gitignore` and `scripts/repository-check.sh` carry a
+  narrow exception for `assets/voices/locked/*.wav`; verified that a `.wav` anywhere
+  else is still rejected.
+
+### Changed
+- `character_consistency.lora_strength: 1.15` recorded in the lock file. The pipeline
+  default of 0.85 was losing character identity outright, not just the scar of #6.
+
+### Notes
+- Subtitle timing corrected: the 168s previously reported was a one-time model download,
+  not inference. Warm, `small` runs in 9.0s and `base` in 3.0s for 21s of audio.
+
 ## 3.0.2 — 2026-08-26
 
 ### Fixed
