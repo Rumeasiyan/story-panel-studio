@@ -65,9 +65,9 @@ Each of these has already caused, or nearly caused, a real failure here.
 
 | Language | Pipeline | Anchor |
 |---|---|---|
-| English | `tts-chatterbox` | `assets/voices/en-narrator-locked.wav` |
-| Tamil | `tts-omnivoice` | `assets/voices/tamil/a01-auto.wav` |
-| Sinhala | `tts-omnivoice` | `assets/voices/tamil/a01-auto.wav` |
+| English | `tts-chatterbox` | `assets/voices/locked/en.wav` |
+| Tamil | `tts-omnivoice` | `assets/voices/locked/a01-auto.wav` |
+| Sinhala | `tts-omnivoice` | `assets/voices/locked/a01-auto.wav` |
 
 Deviate only when the request explicitly asks for a different engine or voice. "This
 model supports more languages" or "this one is newer" is not a reason — the locked set

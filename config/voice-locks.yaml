@@ -6,11 +6,11 @@
 # capable on paper — every alternative here was already generated and rejected by ear.
 #
 # Anchors are gitignored (renders). Rebuild recipes: assets/voices/README.md,
-# assets/voices/tamil/README.md.
+# assets/voices/locked/README.md.
 
 english:
   pipeline: tts-chatterbox
-  anchor: assets/voices/en-narrator-locked.wav
+  anchor: assets/voices/locked/en.wav
   anchor_note: >-
     8s trim of output/voice-samples-chatterbox/en-calm-authoritative.wav, NO formant
     shift. Not reel-narrator-v1.wav, which is the +4% variant and a different voice.
@@ -29,8 +29,8 @@ english:
 tamil:
   pipeline: tts-omnivoice
   language: Tamil
-  anchor: assets/voices/tamil/a01-auto.wav
-  reference_text_from: assets/voices/tamil/README.md
+  anchor: assets/voices/locked/a01-auto.wav
+  reference_text_from: assets/voices/locked/README.md
   register: >-
     Tamil Nadu spoken Tamil, NOT literary. வந்துட்டாரு not வந்தான்; -ங்க plurals;
     dropped final vowels (இல்ல); English loanwords are normal (ஆபீஸ், கார்டு, பேஜ்).
@@ -40,8 +40,8 @@ tamil:
 sinhala:
   pipeline: tts-omnivoice
   language: Sinhala
-  anchor: assets/voices/tamil/a01-auto.wav      # same speaker as Tamil, by design
-  reference_text_from: assets/voices/tamil/README.md
+  anchor: assets/voices/locked/a01-auto.wav      # same speaker as Tamil, by design
+  reference_text_from: assets/voices/locked/README.md
   register: >-
     Spoken Sinhala, NOT written. එයාට ඔක්කොම නැති වුණා, not ඔහු සියල්ල අහිමි කරගෙන
     සිටියේය. Written Sinhala conjugates verbs for person and number; spoken does not.
