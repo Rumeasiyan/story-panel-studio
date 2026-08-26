@@ -10,3 +10,9 @@ rich
 fastapi
 uvicorn[standard]
 python-multipart
+
+# Subtitle alignment (service/pipelines/subtitles.py). The `subtitles` pipeline is
+# registered unconditionally, so without this a fresh bootstrap yields a pipeline that
+# accepts jobs and then fails with ModuleNotFoundError.
+faster-whisper
+soundfile
