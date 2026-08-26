@@ -62,6 +62,8 @@ Record those, not your request — that is what reproduces the panel exactly.
 | Need | Go to |
 |---|---|
 | Full API reference | `service/API.md` |
+| Which model to use for what | `docs/MODEL-CHOICES.md` |
+| Narration engine and anchor per language — **locked, do not substitute** | `config/voice-locks.yaml` |
 | Interactive API docs | `http://localhost:8189/docs` |
 | Measured timings — never estimate | `reports/BENCHMARKS.md` |
 | Licence position per model | `reports/MODEL_LICENSES.md` |
@@ -82,7 +84,9 @@ Record those, not your request — that is what reproduces the panel exactly.
 | `flux2-text-to-image` | image | `prompt` | — |
 | `flux2-edit` | image | `prompt` | `image`, `reference_2..4` |
 | `z-image-text-to-image` | image | `prompt` | — |
-| `tts-indic-parler` | audio | `text` | — |
+| `tts-chatterbox` | audio | `text` or `segments` | `reference_audio` — **English** |
+| `tts-omnivoice` | audio | `text` or `segments` | `reference_audio` — **Tamil, Sinhala** |
+| `tts-indic-parler` | audio | `text` | — · Indic fallback only, not for English |
 | `subtitles` | subtitle | — | `audio` |
 | `tts-indicf5` | audio | — | **broken, issue #2 — do not plan around it** |
 | `wan22-video` | video | — | **weights deleted; 18 GB re-download if ever needed** |
@@ -146,18 +150,33 @@ Register a voice once, then reference it by name. The description is the only th
 holding narrator identity, so it must be byte-identical across episodes — a profile
 enforces that.
 
+The engine and anchor are **locked per language** — see `config/voice-locks.yaml`
+and do not substitute:
+
+| Language | Pipeline | Anchor |
+|---|---|---|
+| English | `tts-chatterbox` | `assets/voices/locked/en.wav` |
+| Tamil | `tts-omnivoice` | `assets/voices/locked/a01-auto.wav` |
+| Sinhala | `tts-omnivoice` | `assets/voices/locked/a01-auto.wav` |
+
+Send the script as `segments`, one entry per beat, so emotion changes between beats
+while the voice does not. A whole script in one call comes out flat, and long blocks
+get truncated.
+
 ```bash
-curl -X POST localhost:8189/api/voices -H 'Content-Type: application/json' -d '{
-  "name":"c2-ta-anime-male","engine":"indic-parler","language":"ta",
-  "voice_description":"..."}'
+curl -X POST localhost:8189/api/generate \
+  -F pipeline=tts-chatterbox \
+  -F reference_audio=@assets/voices/locked/en.wav \
+  -F 'segments=[{"text":"He arrived early, the way he had for eleven years.","exaggeration":0.35,"cfg_weight":0.30,"pause_after":0.5},{"text":"They took it from him in ninety seconds.","exaggeration":0.95,"cfg_weight":0.45}]'
 ```
 
-Then: `{"pipeline":"tts-indic-parler","voice":"c1-en-anime-male","text":"<full script>"}`
+Tamil and Sinhala use the same shape with `language` and `reference_text`, and `speed`
+instead of `exaggeration`/`cfg_weight` — OmniVoice has no emotion control.
 
-Text of any length is one request — it is chunked on sentence boundaries (including the
-Devanagari danda) and concatenated with identical conditioning.
+**Write in spoken register, not written.** Literary Tamil and written Sinhala read as a
+news bulletin. Markers for each are in `config/voice-locks.yaml`.
 
-Registered: `c1-en-anime-male`, `c3-en-cinematic-female`. Tamil channels need their own.
+Plain `text` still works and is chunked on sentence boundaries.
 
 ### Subtitles
 
