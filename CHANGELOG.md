@@ -3,6 +3,30 @@
 Notable changes per version. The version lives in `VERSION`; see AGENTS.md for when
 each part changes.
 
+## 3.2.0 — 2026-08-26
+
+### Added
+- `qwen-image-edit` pipeline — Qwen-Image-Edit 2511, the compositional editor the other
+  two cannot be. Takes up to three reference images and composes their subjects into a
+  new scene, pose or interaction without a mask, which is what `flux2-edit` failed at
+  and what `sdxl-inpaint` needs a mask for.
+- `comfyui-gguf` (city96) as the first pinned custom node, at commit `6ea2651e`. Torch
+  and transformers were checked before and after installing it and are unchanged —
+  2.13.0+cu130 and 5.15.1.
+- `qwen-image-edit-2511` model profile: GGUF Q4_K_M UNet, nvfp4 text encoder and VAE,
+  all pinned by commit. ~19.6 GB.
+
+### Notes
+- 20B does not fit 8 GB of VRAM. It runs as a quant streamed from system RAM, so expect
+  minutes per image. It is a hero-shot tool; panels stay on the locked SDXL and FLUX.2
+  paths and nothing in `generation-locks.yaml` changes.
+- Chosen over FLUX.1 Kontext (12B) and FLUX.2-dev (32B) because it is the only model of
+  that class that quantises down to something this machine can stream **and** is
+  Apache-2.0. The other two are non-commercial, which does not suit monetized channels.
+- Weights were still downloading when this landed — the CDN was serving ~316 KB/s
+  against a 12 GiB file. `modelctl status` reports the profile incomplete until it
+  finishes; the pipeline is registered and will fail with a clear message until then.
+
 ## 3.1.0 — 2026-08-26
 
 ### Added

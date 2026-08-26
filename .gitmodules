@@ -4,3 +4,6 @@
 [submodule "tools/sd-scripts"]
 	path = tools/sd-scripts
 	url = https://github.com/kohya-ss/sd-scripts.git
+[submodule "custom_nodes/comfyui-gguf"]
+	path = custom_nodes/comfyui-gguf
+	url = https://github.com/city96/ComfyUI-GGUF

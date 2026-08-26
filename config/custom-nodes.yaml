@@ -1,36 +1,14 @@
-# Custom node registry for story-panel-studio.
+# Third-party ComfyUI nodes. Pinned by commit, added one at a time — a node pack can
+# replace torch or CUDA packages and break the image engine.
 #
-# EMPTY BY DESIGN. The core setup must work with zero third-party nodes.
-#
-# Rules (see CLAUDE.md):
-#   - Add nodes ONE AT A TIME, each pinned to an exact Git commit.
-#   - Never bulk-install unknown node packs.
-#   - Before adding an entry, inspect: maintenance status, licence, install
-#     instructions, and whether its dependencies would replace torch/CUDA packages.
-#   - `custom-nodectl install` backs up requirements.lock.txt and refuses silently
-#     replacing torch, torchvision, torchaudio, or nvidia-* packages.
-#   - Nodes are installed as Git submodules under the project-root custom_nodes/,
-#     which ComfyUI sees via config/extra_model_paths.yaml.
-#
-# Schema
-#   nodes:
-#     <id>:
-#       repository: https://github.com/owner/name.git
-#       commit: <full 40-character SHA>       # never a branch name
-#       description: str
-#       licence: str
-#       requirements: true | false            # has its own requirements.txt
-#       notes: str
-#
-# Example (commented out — do not install without explicit approval):
-#
-# nodes:
-#   comfyui-ipadapter-plus:
-#     repository: https://github.com/cubiq/ComfyUI_IPAdapter_plus.git
-#     commit: 0000000000000000000000000000000000000000
-#     description: IP-Adapter nodes for character consistency
-#     licence: VERIFY_FROM_REPOSITORY
-#     requirements: true
-#     notes: Needs models under models/ipadapter and models/clip_vision.
+# After installing any of these, check `transformers` and `torch` still match what
+# ComfyUI needs (see AGENTS.md).
 
-nodes: {}
+nodes:
+  comfyui-gguf:
+    description: >-
+      Loads GGUF-quantised UNets. Needed for Qwen-Image-Edit: the model is 20B and only
+      fits this machine as a quant streamed from system RAM.
+    repository: https://github.com/city96/ComfyUI-GGUF
+    commit: 6ea2651e7df66d7585f6ffee804b20e92fb38b8a
+    licence: Apache-2.0
