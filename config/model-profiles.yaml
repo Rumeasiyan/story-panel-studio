@@ -104,6 +104,40 @@ profiles:
         licence_url: https://huggingface.co/Wan-AI/Wan2.2-TI2V-5B
         commercial_review_required: false
 
+  qwen-image-edit-2511:
+    description: Qwen-Image-Edit 2511 — compositional editing (20B, GGUF Q4_K_M)
+    engine: comfyui
+    workflow_family: qwen-image-edit
+    notes: >-
+      20B. Does not fit 8 GB VRAM; runs as a GGUF quant streamed from system RAM, so
+      expect minutes per image rather than seconds. Needs the pinned comfyui-gguf
+      custom node. Chosen because it is the only model that composes specific subjects
+      from reference images into a new scene without a mask, and because it is
+      Apache-2.0 — FLUX.2-dev (32B) and HunyuanImage-3.0 (80B) are both larger and
+      non-commercial.
+    artifacts:
+      - id: qwen-image-edit-2511-q4-k-m
+        repository: unsloth/Qwen-Image-Edit-2511-GGUF
+        revision: 0d33d9692b4b26212297240d87b0d4719aa4fd06
+        filename: qwen-image-edit-2511-Q4_K_M.gguf
+        destination: models/unet
+        size_bytes: 13240000000
+        licence: Apache-2.0
+      - id: qwen-2-5-vl-7b-nvfp4
+        repository: Comfy-Org/Qwen-Image_ComfyUI
+        revision: 7beb7b647f04469fbe64ba8adc2bb0d7e5e9f73f
+        filename: split_files/text_encoders/qwen_2.5_vl_7b_nvfp4.safetensors
+        destination: models/text_encoders
+        size_bytes: 6114000000
+        licence: Apache-2.0
+      - id: qwen-image-vae
+        repository: Comfy-Org/Qwen-Image_ComfyUI
+        revision: 7beb7b647f04469fbe64ba8adc2bb0d7e5e9f73f
+        filename: split_files/vae/qwen_image_vae.safetensors
+        destination: models/vae
+        size_bytes: 254000000
+        licence: Apache-2.0
+
   flux2-klein-4b:
     description: FLUX.2 klein 4B — image generation and instruction editing
     engine: comfyui

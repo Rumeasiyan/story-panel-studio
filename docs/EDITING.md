@@ -8,7 +8,7 @@ option here was tested; the failures below are recorded so they are not retried.
 | Change a property everywhere — wardrobe, weather, time of day, palette | `flux2-edit` | composition, roughly |
 | Change one **region** — remove, add or replace something | `sdxl-inpaint` + mask | everything outside the mask, **pixel-exact** |
 | Put a known character in a new scene | `sdxl-text-to-image` + character LoRA | the character's identity |
-| Composite two finished images into one | *not achievable locally* — use a LoRA | — |
+| Put **specific people from photos** into a new scene, pose or interaction, no mask | `qwen-image-edit` | the subjects' faces |
 
 ## Global restyle — `flux2-edit`
 
@@ -70,12 +70,33 @@ once and generate them directly into whatever scene is needed.
 Then pass `lora` and `lora_strength` on any `sdxl-*` call. `lora_strength: 1.15` is
 locked — 0.85 lost hair colour and eye colour outright, not just fine detail.
 
-## Why there is no single compositional editor here
+## Compositional editing — `qwen-image-edit`
 
-The models that do targeted editing in one shot need far more VRAM than this machine
-has: Qwen-Image-Edit is 20B, FLUX.1 Kontext 12B, FLUX.2-dev 32B, against 8 GB. FLUX.2
-klein-4B is the largest that fits, and it is an instruction model, not a compositional
-one. So the local answer is the right tool per operation, which this repo already has.
+Takes up to three reference images and composes their subjects into a new scene without
+a mask. This is the one that can do "the man from image 1 and the woman from image 2
+embracing on a beach, both faces intact".
+
+```bash
+curl -X POST localhost:8189/api/generate \
+  -F pipeline=qwen-image-edit \
+  -F 'prompt=the man from image 1 and the woman from image 2 embracing on a beach at sunset, keep both faces exactly' \
+  -F image=@person_a.png -F reference_2=@person_b.png
+```
+
+**It is slow.** 20B on an 8 GB card, run as a GGUF quant streamed from system RAM —
+minutes per image, not seconds. It is a hero-shot tool. Panels stay on the locked SDXL
+and FLUX.2 paths.
+
+Needs the pinned `comfyui-gguf` node and the `qwen-image-edit-2511` profile
+(~19.6 GB). Apache-2.0, which is why it is viable at all: FLUX.2-dev (32B) and
+HunyuanImage-3.0 (80B) are both larger *and* non-commercial.
+
+## Why the other big editors are not here
+
+FLUX.1 Kontext is 12B and FLUX.2-dev 32B against 8 GB of VRAM, and both are
+non-commercial. Qwen-Image-Edit is the only one of that class that both quantises down
+to something this machine can stream and carries a licence that suits monetized
+channels.
 
 Reference output: `output/edit-guide/SHEET-editing.png` — one row per operation, source
 and mask alongside the result.
