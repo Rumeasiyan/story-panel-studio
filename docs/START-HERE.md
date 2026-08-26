@@ -250,6 +250,28 @@ detached: `setsid nohup ./scripts/serve.sh > logs/serve.log 2>&1 &`.
 
 ---
 
+## Assembly notes for the orchestrator
+
+Assembly is **your** job, not this repo's. But the assets have properties that will
+break a naive `ffmpeg` invocation, all of them found by actually cutting an episode
+(`output/e2e/`, story in `content/stories/the-clause.json`).
+
+| Property | What to do |
+|---|---|
+| Narration is **24 kHz mono** | Resample to **48 kHz stereo**. MP4 players and every social platform expect 44.1/48 kHz; at 24 kHz many play silence with no error. |
+| Chatterbox and OmniVoice are **not level-matched** — OmniVoice lands ~7 dB quieter | Normalise, e.g. `loudnorm=I=-16:TP=-1.5:LRA=11`, or Tamil and Sinhala ship quieter than English. |
+| **libass mis-shapes Sinhala** — vowel signs detach and reorder | Do not burn Sinhala subtitles with `-vf subtitles=` or any ASS burner. Pango and PIL+raqm shape the same font correctly, or ship the `.srt` as a sidecar and let the platform render it. Tamil survives libass; Sinhala does not. |
+| Subtitle **cue counts differ per language** — 22 en / 30 ta / 23 si for one story | Do not time panels by indexing into cues. It lands near the beats in English and drifts badly in Tamil. |
+| Panels should cut on **beat boundaries** | The narration pipeline inserts `pause_after` between beats, so the longest silences in the wav *are* the beat boundaries. `silencedetect=noise=-40dB:d=0.28`, take the longest `n_beats - 1`, split each beat across its panels. |
+| The **same story runs different lengths** per language — 41.4s en / 59.7s ta / 50.8s si | Panel counts and pacing are per-language decisions, not one timeline reused. |
+| Panels are **16:9**; Reels/Shorts are 9:16 | Letterboxing leaves roughly half the frame black. Generate at 9:16, or fill with a blurred background. |
+
+Measured end-to-end cost for one episode — 16 panels, narration in three languages,
+subtitles: **10.6 min** (panels 403s, narration 174s, subtitles 57s), peak VRAM under
+1 GB.
+
+---
+
 ## 8. Known open problems
 
 | Issue | Effect |

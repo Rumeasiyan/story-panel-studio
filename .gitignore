@@ -81,3 +81,6 @@ cache/object-info.json
 .venv-trainer/
 characters/_training/
 characters/*/images/
+
+# Generated font instances — regenerate with assets/fonts/README.md
+assets/fonts/*.ttf
