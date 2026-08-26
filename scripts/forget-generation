@@ -147,6 +147,26 @@ def vacuum() -> None:
         conn.close()
 
 
+def describe(row) -> str:
+    """One line naming what is being erased.
+
+    There is no `prompt` column — the caller's parameters live in `params` as JSON,
+    and which key carries the sensitive text depends on the pipeline: image work uses
+    `prompt`, narration uses `text` or `segments`. Reading `row["prompt"]` raised
+    IndexError on every job that had a history row, so the tool only ever ran to
+    completion for jobs already missing from the database.
+    """
+    try:
+        params = json.loads(row["params"] or "{}")
+    except (json.JSONDecodeError, TypeError):
+        params = {}
+    for key in ("prompt", "text", "segments"):
+        value = params.get(key)
+        if value:
+            return f"{row['pipeline']} / {key}: {str(value)[:70]}"
+    return f"{row['pipeline']} ({row['kind']})"
+
+
 def forget(job_ids: list[str], use_shred: bool) -> int:
     if not DB_PATH.exists():
         print("no database; nothing to forget")
@@ -170,7 +190,7 @@ def forget(job_ids: list[str], use_shred: bool) -> int:
         removed: list[str] = []
         print(bold(f"\n{job_id}"))
         if row:
-            print(f"  prompt: {row['prompt'][:70]}")
+            print(f"  {describe(row)}")
 
         # 1. rendered video(s) — glob, since ComfyUI appends its own counter
         for path in sorted(OUTPUT_DIR.rglob(f"{job_id}*")):

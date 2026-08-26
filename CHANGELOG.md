@@ -3,6 +3,25 @@
 Notable changes per version. The version lives in `VERSION`; see AGENTS.md for when
 each part changes.
 
+## 2.4.1 — 2026-08-26
+
+### Fixed
+- `forget-generation` crashed with `IndexError` on any job that had a history row. It
+  read `row["prompt"]`, but the `jobs` table has no such column — the caller's
+  parameters live in `params` as JSON, under `prompt` for image work and `text` or
+  `segments` for narration. The tool therefore only ever ran to completion for jobs
+  already missing from the database, which is the opposite of what a deletion tool
+  should do. Found by running it, not by reading it.
+
+### Changed
+- `docs/START-HERE.md` narration guidance was stale and actively misleading: it listed
+  neither new pipeline and its recipe told the orchestrator to narrate with
+  `tts-indic-parler`, the engine rejected for English. It now carries the locked
+  per-language table, the `segments` shape, and the spoken-register rule.
+- `docs/MODEL-CHOICES.md` reduced to tables. Its reader is an agent.
+- Voice anchors moved to `assets/voices/locked/`; "narrator" named the wrong axis and
+  misled twice, since register is a property of the script, not the anchor.
+
 ## 2.4.0 — 2026-08-26
 
 ### Added
