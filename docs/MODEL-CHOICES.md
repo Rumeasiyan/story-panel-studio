@@ -12,6 +12,7 @@ Pins and hashes: `config/model-profiles.yaml`. Reference output: `output/compare
 | Cinematic panels | `sdxl-text-to-image` `model=cinematic` — RealVisXL V4 | prose | CreativeML Open RAIL++-M |
 | Character consistency | LoRA, `./scripts/train-lora --base illustrious` | — | — |
 | Fast drafts | `lora=sdxl_lightning_4step_lora.safetensors`, 4 steps, cfg 1.5, euler/sgm_uniform | — | CreativeML Open RAIL++-M |
+| Establishing shots, no recurring character | `flux2-text-to-image` — FLUX.2 klein 4B | prose | Apache-2.0 |
 | Image editing | `flux2-edit` — FLUX.2 klein 4B | prose | Apache-2.0 |
 
 ## Video
@@ -68,5 +69,4 @@ Rebuild: `config/venv-locks/`.
 | Item | Issue |
 |---|---|
 | Anchors are synthetic, not a recorded person | #7 |
-| Sinhala anchor is Tamil-derived; native candidates untested by ear | — |
 | `kai.safetensors` training base was never recorded; verified working on illustrious | — |

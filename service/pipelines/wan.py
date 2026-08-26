@@ -95,9 +95,11 @@ register(ComfyPipeline(
     id="wan22-video",
     kind="video",
     title="Wan 2.2 TI2V-5B video",
-    description="Text or image to video. 720p native at 24 fps; trained for clips up "
-                "to 121 frames (5s). Slow on 8 GB but the best quality available "
-                "locally.",
+    description="OUT OF SCOPE — do not plan around this. Weights are not installed and "
+                "should not be downloaded: generation time did not justify the result "
+                "for a still-panel product, and motion belongs to the orchestrator "
+                "(pan/zoom over panels). Left registered as an escape hatch only. "
+                "Text or image to video, 720p at 24 fps, up to 121 frames (5s).",
     requires_profile="wan22-ti2v-5b",
     accepts_files=["image"],
     params=VIDEO_COMMON + [Param("fps", "int", default=24, minimum=1, maximum=60)],
