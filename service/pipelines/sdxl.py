@@ -12,16 +12,14 @@ from .base import ComfyPipeline, Param, register
 # Only these checkpoints may be selected. Keys are stable ids for the API; values are
 # the exact filenames ComfyUI resolves through config/extra_model_paths.yaml.
 CHECKPOINTS = {
-    "anime": "animagine-xl-4.0-opt.safetensors",
+    "anime": "Illustrious-XL-v2.0.safetensors",
     "cinematic": "RealVisXL_V4.0.safetensors",
-    "noobai": "NoobAI-XL-v1.1.safetensors",
-    "illustrious": "Illustrious-XL-v2.0.safetensors",
 }
 
-# NoobAI and Illustrious are trained on booru tagging: they expect comma-separated tags
-# ("1girl, long hair, city street, night") rather than the prose Animagine and RealVis
-# handle well. Same pipeline, different prompting style.
-BOORU_CHECKPOINTS = {"noobai", "illustrious"}
+# Illustrious is trained on booru tagging: it expects comma-separated tags
+# ("1girl, long hair, city street, night") rather than the prose RealVis handles well.
+# Same pipeline, different prompting style.
+BOORU_CHECKPOINTS = {"anime"}
 
 SAMPLERS = ["euler", "euler_ancestral", "dpmpp_2m", "dpmpp_2m_sde", "dpmpp_sde",
             "uni_pc", "ddim", "lcm"]
@@ -42,8 +40,8 @@ COMMON = [
     Param("prompt", "str", required=True, help="What to draw."),
     Param("negative", "str", default=DEFAULT_NEGATIVE, help="What to avoid."),
     Param("model", "enum", default="anime", choices=list(CHECKPOINTS),
-          help="Checkpoint: anime (Animagine XL 4.0), cinematic (RealVisXL V4), "
-               "noobai (NoobAI-XL v1.1) or illustrious (Illustrious-XL v2.0). "
+          help="Checkpoint: anime (Illustrious-XL v2.0, booru tags) or cinematic "
+               "(RealVisXL V4, prose). "
                "The last two are booru-tag driven — prompt with comma-separated tags."),
     Param("steps", "int", default=25, minimum=1, maximum=100),
     Param("cfg", "float", default=6.0, minimum=0.0, maximum=20.0),

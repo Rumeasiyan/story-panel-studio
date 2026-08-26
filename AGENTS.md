@@ -31,7 +31,7 @@ environments are never committed; they are rebuilt from pinned manifests.
 | `service/app.py` | Routes, parameter validation, file serving. Generic across pipelines. |
 | `service/jobs.py` | SQLite job store and the single serialized worker. |
 | `config/model-profiles.yaml` | Every model: pinned revision, size, SHA-256, licence. |
-| `config/voice-locks.yaml` | **Which narration engine and anchor to use per language.** Read before generating any audio. |
+| `config/generation-locks.yaml` | **Which narration engine and anchor to use per language.** Read before generating any audio. |
 | `config/extra_model_paths.yaml` | How ComfyUI finds weights in the root `models/`. |
 | `scripts/` | `doctor`, `comfy`, `serve`, `modelctl`, `forget-generation`, `fetch-tts`, `train-lora`. |
 | `tools/sd-scripts` | kohya-ss trainer, pinned submodule. Runs in `.venv-trainer`. |
@@ -54,14 +54,24 @@ Each of these has already caused, or nearly caused, a real failure here.
 | Never commit weights, renders, inputs, `.env`, or caches | A 7 GB checkpoint in git history is effectively permanent. | `.githooks/pre-commit`, `.github/workflows/repository-safety.yml` |
 | Pin every model to a commit SHA, never `main` | `main` moves; a floating pin makes a "reproducible" manifest a lie. | `config/model-profiles.yaml` |
 | Pin ComfyUI and custom nodes by commit; add nodes one at a time | Node packs can replace torch/CUDA packages. | `.gitmodules`, `scripts/custom-nodectl` |
-| Narration uses the locked engine and anchor for the language | These were chosen by listening; every alternative was generated and rejected by ear. An agent picking a "better" engine from its description silently changes the voice of a channel. | `config/voice-locks.yaml` |
+| Generation uses the locked model for the job — images, video and narration | Every alternative was generated and then rejected by looking or listening. An agent picking a "better" model from its description silently changes the look or voice of a channel. | `config/generation-locks.yaml` |
 | Do not touch the NVIDIA driver, Secure Boot, kernels, or Hyprland config | This is also a gaming machine with a working driver. | — |
 | Deleting a job must clear the WAL too | `VACUUM` alone leaves deleted prompts readable in `app.db-wal`. Found by planting a canary and grepping. | `jobs.purge_database()` |
 | `--shred` cannot erase on this filesystem | `/home` is btrfs, copy-on-write: overwriting writes new blocks and leaves the original. LUKS is the real protection. | `scripts/forget-generation` warns |
 
-## Narration
+## Locked models
 
-**Use `config/voice-locks.yaml`. Do not choose an engine yourself.**
+**Use `config/generation-locks.yaml`. Do not choose a model yourself.**
+
+| Job | Use |
+|---|---|
+| Anime panels | `sdxl-text-to-image`, `model=anime` (Illustrious-XL v2.0, **booru tags**) |
+| Cinematic panels | `sdxl-text-to-image`, `model=cinematic` (RealVisXL V4, prose) |
+| Character consistency | LoRA via `./scripts/train-lora --base illustrious` |
+| Image editing | `flux2-edit` |
+| Video | **out of scope** — no weights installed, do not download |
+
+Narration:
 
 | Language | Pipeline | Anchor |
 |---|---|---|
@@ -81,7 +91,7 @@ Three things that are easy to get wrong:
 - **`a01-auto.wav` cannot be regenerated.** It came from OmniVoice's auto mode, which
   invents a speaker per call. The file is the only copy of that narrator.
 - **Write in spoken register, not written.** Literary Tamil (`வந்தான்`) and written
-  Sinhala (`ඔහු ... සිටියේය`) read as a news bulletin. `voice-locks.yaml` gives the
+  Sinhala (`ඔහු ... සිටියේය`) read as a news bulletin. `generation-locks.yaml` gives the
   markers for each.
 
 Emotion is per-beat and belongs in `segments`, one call per beat — see `service/API.md`.

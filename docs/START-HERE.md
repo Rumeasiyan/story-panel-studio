@@ -63,7 +63,7 @@ Record those, not your request — that is what reproduces the panel exactly.
 |---|---|
 | Full API reference | `service/API.md` |
 | Which model to use for what | `docs/MODEL-CHOICES.md` |
-| Narration engine and anchor per language — **locked, do not substitute** | `config/voice-locks.yaml` |
+| Narration engine and anchor per language — **locked, do not substitute** | `config/generation-locks.yaml` |
 | Interactive API docs | `http://localhost:8189/docs` |
 | Measured timings — never estimate | `reports/BENCHMARKS.md` |
 | Licence position per model | `reports/MODEL_LICENSES.md` |
@@ -150,7 +150,7 @@ Register a voice once, then reference it by name. The description is the only th
 holding narrator identity, so it must be byte-identical across episodes — a profile
 enforces that.
 
-The engine and anchor are **locked per language** — see `config/voice-locks.yaml`
+The engine and anchor are **locked per language** — see `config/generation-locks.yaml`
 and do not substitute:
 
 | Language | Pipeline | Anchor |
@@ -174,7 +174,7 @@ Tamil and Sinhala use the same shape with `language` and `reference_text`, and `
 instead of `exaggeration`/`cfg_weight` — OmniVoice has no emotion control.
 
 **Write in spoken register, not written.** Literary Tamil and written Sinhala read as a
-news bulletin. Markers for each are in `config/voice-locks.yaml`.
+news bulletin. Markers for each are in `config/generation-locks.yaml`.
 
 Plain `text` still works and is chunked on sentence boundaries.
 

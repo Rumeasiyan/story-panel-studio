@@ -7,7 +7,7 @@ Not committed — these are renders. Rebuild with the recipe below.
 
 ## locked/en.wav
 
-**The locked English narrator** — see `config/voice-locks.yaml`. An 8s trim of the
+**The locked English narrator** — see `config/generation-locks.yaml`. An 8s trim of the
 calm-authoritative sample with **no formant shift**, driven per-beat by Chatterbox's
 `exaggeration` and `cfg_weight`.
 
