@@ -1,6 +1,6 @@
 # Locked anchors
 
-The voices pinned in `config/voice-locks.yaml`. "Locked" means the speaker, not the
+The voices pinned in `config/generation-locks.yaml`. "Locked" means the speaker, not the
 delivery style — register is a property of the script text, not of these files, and
 all three channels are written in spoken register.
 

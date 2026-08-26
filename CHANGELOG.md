@@ -3,6 +3,38 @@
 Notable changes per version. The version lives in `VERSION`; see AGENTS.md for when
 each part changes.
 
+## 3.0.0 — 2026-08-26
+
+### Breaking
+- `sdxl-*` `model` accepts only `anime` and `cinematic`. `noobai` and `illustrious` are
+  gone as separate ids — `anime` now resolves to Illustrious-XL v2.0, which means
+  **`model=anime` produces a different look than before and expects booru tags rather
+  than prose**. Callers sending `noobai` or `illustrious` get a 400 naming the valid set.
+- `z-image-text-to-image` deregistered. Its pipeline asks ComfyUI for CLIP loader type
+  `z_image`, which ComfyUI 0.34.0 does not offer — it could not run at all.
+
+### Changed
+- Every generation choice is locked in `config/generation-locks.yaml` (renamed from
+  `voice-locks.yaml`, now covering images and video too). One file an agent reads
+  before generating anything.
+- Video is out of scope. No Wan weights installed and none should be downloaded; motion
+  belongs to the orchestrator, over still panels.
+- `docs/MODEL-CHOICES.md` is the locked decision table, with a `Rejected` section so a
+  ruled-out model is not re-proposed.
+
+### Removed
+- Animagine XL 4.0, NoobAI-XL v1.1, Z-Image Turbo, SDXL Lightning 2-step — 19.4 GB.
+  Chosen by rendering the same two scenes through every candidate at a fixed seed
+  (`output/compare/`) and judging the images. Animagine ignored "heavy rain" in both
+  prompts; NoobAI produced the best face in the set but its Fair AI Public License
+  1.0-SD is unresolved for commercial use and the channels are monetized.
+
+### Notes
+- `kai.safetensors` was verified to work on Illustrious before NoobAI was deleted; its
+  training base had never been recorded, which is now listed as an open item.
+- The Lightning 3.1x speedup in BENCHMARKS.md is batch-4. At batch 1 it is 24s -> 12s
+  with a real quality cost, so it is for candidate batches, not finals.
+
 ## 2.4.1 — 2026-08-26
 
 ### Fixed

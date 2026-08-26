@@ -6,7 +6,7 @@
   that apply to the delegated work — especially the localhost binding on ComfyUI and the
   rule that user input never becomes graph structure. A subagent given "add a pipeline"
   with no context will happily accept a caller-supplied graph. The same applies to
-  narration: restate the locked engine and anchor from `config/voice-locks.yaml`, or a
+  narration: restate the locked engine and anchor from `config/generation-locks.yaml`, or a
   subagent will pick whichever engine sounds best on paper and silently re-voice a
   channel.
 - **Verify by running.** This repository has no test suite. Three real bugs here were
