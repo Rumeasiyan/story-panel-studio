@@ -15,6 +15,7 @@ Pins and hashes: `config/model-profiles.yaml`. Reference output: `output/compare
 | Establishing shots, no recurring character | `flux2-text-to-image` — FLUX.2 klein 4B | prose | Apache-2.0 |
 | Image editing — **global restyle** | `flux2-edit` — FLUX.2 klein 4B | prose | Apache-2.0 |
 | Image editing — **regional** (remove/add/replace) | `sdxl-inpaint` + mask | see `docs/EDITING.md` | as checkpoint |
+| Image editing — **multi-subject** (combine 2+ images) | `qwen-image-edit` — ~10 min/image, restart ComfyUI between jobs | prose | Apache-2.0 |
 
 ## Video
 

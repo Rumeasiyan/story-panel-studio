@@ -85,6 +85,7 @@ Record those, not your request — that is what reproduces the panel exactly.
 | `flux2-text-to-image` | image | `prompt` | — |
 | `flux2-edit` | image | `prompt` | `image`, `reference_2..4` — **global restyle only, no regional edits** |
 | `sdxl-inpaint` | image | `prompt` | `image`, `mask` — **the only regional editor** |
+| `qwen-image-edit` | image | `prompt` | `image`, `reference_2..3` — **combines subjects from several images; ~10 min, restart ComfyUI between jobs** |
 | `z-image-text-to-image` | image | `prompt` | — |
 | `tts-chatterbox` | audio | `text` or `segments` | `reference_audio` — **English** |
 | `tts-omnivoice` | audio | `text` or `segments` | `reference_audio` — **Tamil, Sinhala** |

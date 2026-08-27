@@ -120,22 +120,22 @@ profiles:
         repository: unsloth/Qwen-Image-Edit-2511-GGUF
         revision: 0d33d9692b4b26212297240d87b0d4719aa4fd06
         filename: qwen-image-edit-2511-Q4_K_M.gguf
-        destination: models/unet
-        size_bytes: 13240000000
+        destination: models/diffusion_models
+        size_bytes: 13244758624
         licence: Apache-2.0
       - id: qwen-2-5-vl-7b-nvfp4
         repository: Comfy-Org/Qwen-Image_ComfyUI
         revision: 7beb7b647f04469fbe64ba8adc2bb0d7e5e9f73f
         filename: split_files/text_encoders/qwen_2.5_vl_7b_nvfp4.safetensors
         destination: models/text_encoders
-        size_bytes: 6114000000
+        size_bytes: 6114433446
         licence: Apache-2.0
       - id: qwen-image-vae
         repository: Comfy-Org/Qwen-Image_ComfyUI
         revision: 7beb7b647f04469fbe64ba8adc2bb0d7e5e9f73f
         filename: split_files/vae/qwen_image_vae.safetensors
         destination: models/vae
-        size_bytes: 254000000
+        size_bytes: 253806246
         licence: Apache-2.0
 
   flux2-klein-4b:

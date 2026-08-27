@@ -3,6 +3,33 @@
 Notable changes per version. The version lives in `VERSION`; see AGENTS.md for when
 each part changes.
 
+## 3.2.1 — 2026-08-27
+
+### Fixed
+- The Qwen GGUF was installed to `models/unet`, which `extra_model_paths.yaml` does not
+  map — only `models/diffusion_models` is. ComfyUI reported "model file not found" for a
+  file plainly on disk, and its suggested remedy named the wrong profile. Moved, and the
+  profile's `destination` corrected.
+- `qwen-image-edit-2511` artifact sizes were approximations, so `modelctl` reported
+  `size-mismatch` on three complete files. Replaced with measured byte counts; the
+  profile now verifies as `installed`.
+
+### Changed
+- `docs/EDITING.md` leads with a decision rule: reach for `flux2-edit` first, escalate to
+  `sdxl-inpaint` when the change is regional and maskable, and to `qwen-image-edit` only
+  when subjects from more than one image must be combined. Measured timings for four
+  operations across all three editors are recorded alongside it.
+- `editing_multi_subject` added to `generation-locks.yaml`, carrying the cost and the
+  restart warning.
+
+### Notes
+- Qwen measured at 440-631s per image against 20-50s for the alternatives, and it
+  matches or beats them on every operation tested. Only multi-subject composition
+  justifies 17-25x the time.
+- Running three Qwen edits back to back OOM-killed both ComfyUI and the API. A 13 GB
+  GGUF plus a 6 GB text encoder does not survive a second job on a warm process with
+  31 GB of RAM. ComfyUI must be restarted between Qwen jobs.
+
 ## 3.2.0 — 2026-08-26
 
 ### Added

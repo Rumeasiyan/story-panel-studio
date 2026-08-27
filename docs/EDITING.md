@@ -3,12 +3,37 @@
 **Pick the tool by the shape of the change, not by which model looks best.** Every
 option here was tested; the failures below are recorded so they are not retried.
 
-| You want to | Use | Preserves |
-|---|---|---|
-| Change a property everywhere — wardrobe, weather, time of day, palette | `flux2-edit` | composition, roughly |
-| Change one **region** — remove, add or replace something | `sdxl-inpaint` + mask | everything outside the mask, **pixel-exact** |
-| Put a known character in a new scene | `sdxl-text-to-image` + character LoRA | the character's identity |
-| Put **specific people from photos** into a new scene, pose or interaction, no mask | `qwen-image-edit` | the subjects' faces |
+| You want to | Use | Time | Preserves |
+|---|---|---|---|
+| Change a property everywhere — wardrobe, weather, time of day, palette | **`flux2-edit`** | ~20-30s | composition, roughly |
+| Change one **region** you can mask — remove, add, replace | **`sdxl-inpaint`** + mask | ~30-50s | everything outside the mask, pixel-exact |
+| Put a known character in a new scene | `sdxl-text-to-image` + character LoRA | ~24s | the character's identity |
+| **Combine subjects from two or more images** into one new scene | **`qwen-image-edit`** | **~10 min** | both subjects' faces |
+
+## Decision rule
+
+**Reach for `flux2-edit` first.** It handles most edits at 20-30s and was judged good
+enough on wardrobe, weather and time-of-day changes.
+
+**Escalate only when it cannot do the job:**
+
+1. The change is confined to a region *and* you can produce a mask → `sdxl-inpaint`.
+   Faster and more precise than the alternatives, and the unmasked area is untouched.
+2. The edit needs subjects **from more than one image** combined — "these two people,
+   embracing, somewhere else" → `qwen-image-edit`. This is the only case where it wins,
+   and it is the only tool that can do it at all.
+
+Measured across four operations on the same sources (`output/qwen-test/SHEET-edit-models.png`):
+
+| Operation | `flux2-edit` | `sdxl-inpaint` | `qwen-image-edit` |
+|---|---|---|---|
+| change clothes | 24s ✓ | needs a mask | 440s ✓ |
+| remove a person | 21s ✗ | 27s ✓ | 440s ✓ |
+| add a person | 21s ~ | 48s ✓ | 500s ✓ |
+| merge two people | 33s ✗ | not possible | **631s ✓** |
+
+`qwen-image-edit` matches or beats the others on every row, and costs 17-25x the time
+for it. Only the last row justifies that.
 
 ## Global restyle — `flux2-edit`
 
@@ -83,9 +108,11 @@ curl -X POST localhost:8189/api/generate \
   -F image=@person_a.png -F reference_2=@person_b.png
 ```
 
-**It is slow.** 20B on an 8 GB card, run as a GGUF quant streamed from system RAM —
-minutes per image, not seconds. It is a hero-shot tool. Panels stay on the locked SDXL
-and FLUX.2 paths.
+**It is slow and it will crash the stack if batched.** 20B on an 8 GB card, streamed
+from system RAM: 440-631s per image, measured. Worse, a 13 GB GGUF plus a 6 GB text
+encoder does not survive a *second* job on a warm ComfyUI here — the first attempt at
+three consecutive edits OOM-killed both ComfyUI and the API. **Restart ComfyUI between
+Qwen jobs.** Panels stay on the locked SDXL and FLUX.2 paths.
 
 Needs the pinned `comfyui-gguf` node and the `qwen-image-edit-2511` profile
 (~19.6 GB). Apache-2.0, which is why it is viable at all: FLUX.2-dev (32B) and
