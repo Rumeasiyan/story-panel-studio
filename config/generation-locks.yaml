@@ -46,6 +46,15 @@ image:
       targeted removal or addition, and identity transfer between two images. Verified
       across denoise 0.5/0.65/0.8/1.0 — it either changes nothing or regenerates the
       whole frame. Use editing_regional instead. See docs/EDITING.md.
+  editing_multi_subject:
+    pipeline: qwen-image-edit
+    use_for: >-
+      combining subjects from two or more images into one new scene — the only case
+      where this model is worth its cost, and the only tool that can do it at all
+    cost: 440-631s per image, measured, against 20-50s for the alternatives
+    warning: >-
+      Restart ComfyUI between jobs. A 13 GB GGUF plus a 6 GB text encoder OOM-killed
+      both ComfyUI and the API when three edits ran back to back on a warm process.
   editing_regional:
     pipeline: sdxl-inpaint
     use_for: remove, add or replace something in one region of a panel
