@@ -107,6 +107,7 @@ API docs.
 | Full API reference | `service/API.md` |
 | Which model to use for what | `docs/MODEL-CHOICES.md` |
 | **How to edit an image — pick the tool by the shape of the change** | `docs/EDITING.md` |
+| A paste-ready prompt for an agent on another machine | `docs/REMOTE-AGENT-PROMPT.md` |
 | Narration engine and anchor per language — **locked, do not substitute** | `config/generation-locks.yaml` |
 | Interactive API docs | `http://localhost:8189/docs` |
 | Measured timings — never estimate | `reports/BENCHMARKS.md` |
