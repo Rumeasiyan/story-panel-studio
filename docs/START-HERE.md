@@ -57,6 +57,49 @@ Record those, not your request — that is what reproduces the panel exactly.
 
 ---
 
+## Calling it from another machine
+
+The orchestrator does not have to run on the GPU box. The API is plain HTTP, so any
+machine on the same Tailscale tailnet can drive it — verified end to end from a MacBook:
+submit, poll, download the PNG.
+
+**The API binds to the Tailscale address, never `0.0.0.0`.** Set it in `.env` on the GPU
+host:
+
+```bash
+tailscale ip -4                 # the GPU host's tailnet address
+echo "UI_HOST=<that address>" >> .env
+./scripts/serve.sh
+```
+
+Bound this way it is reachable from the tailnet and from nothing else. `0.0.0.0` would
+also expose it on café wifi and any LAN the machine joins.
+
+From the client:
+
+```bash
+export SPS=http://<gpu-host-tailnet-ip>:8189
+
+curl -s $SPS/api/pipelines                       # the live contract
+JOB=$(curl -s -X POST $SPS/api/generate -H 'Content-Type: application/json' \
+  -d '{"pipeline":"sdxl-text-to-image","prompt":"...","model":"anime"}' | jq -r .id)
+curl -s $SPS/api/jobs/$JOB                       # poll
+curl -s "$SPS/api/jobs/$JOB/output?index=0" -o panel.png
+```
+
+Everything works this way — images, narration in all three languages, subtitles,
+editing. Multipart for uploads (`-F image=@panel.png`). `$SPS/docs` serves interactive
+API docs.
+
+| | |
+|---|---|
+| **ComfyUI is never exposed** | It stays on `127.0.0.1:8188`. `/prompt` executes arbitrary node graphs, so exposing it is remote code execution on the GPU host. `comfy.sh` refuses to start with a non-loopback host. Clients do not need it — the REST API is the whole surface. |
+| **There is no authentication** | Anyone on the tailnet can drive the GPU and read past jobs. Fine for a personal tailnet of your own devices; put auth in front of it before adding anyone else or sharing a node. |
+| **The GPU host does the work** | The client is only a client. The host must be awake with `./scripts/serve.sh` running. |
+| **`UI_HOST` lives in `.env`** | Gitignored, so it does not follow a clone to another machine. |
+
+---
+
 ## 3. Where things live
 
 | Need | Go to |

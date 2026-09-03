@@ -47,6 +47,7 @@ Each of these has already caused, or nearly caused, a real failure here.
 
 | Rule | Why | Enforced at |
 |---|---|---|
+| The API binds to the Tailscale address, never `0.0.0.0` | Remote clients need it; `0.0.0.0` would also expose it on café wifi and any LAN. There is no auth in front of it. | `UI_HOST` in `.env`; see `docs/START-HERE.md` |
 | ComfyUI binds to `127.0.0.1` only | `/prompt` executes arbitrary node graphs. Exposing it is remote code execution on this workstation. | `scripts/comfy.sh` refuses non-loopback `COMFY_HOST` |
 | User input never becomes graph structure | Same reason. Pipelines fill typed fields into a fixed template; a caller-supplied graph would be arbitrary execution. | `service/pipelines/*.py` build functions |
 | Never install a model's dependencies into `.venv` without checking `transformers` and `torch` after | `parler-tts` pins `transformers==4.46.1` and sd-scripts pins `4.54.1`; ComfyUI needs `>=4.50.3`. Installing parler into `.venv` downgraded transformers and left the image engine one restart from breaking. | `.venv-parler`, `.venv-trainer` isolation |
