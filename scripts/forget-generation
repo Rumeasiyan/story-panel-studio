@@ -195,10 +195,14 @@ def forget(job_ids: list[str], use_shred: bool) -> int:
         # 1. rendered video(s) — glob, since ComfyUI appends its own counter
         for path in sorted(OUTPUT_DIR.rglob(f"{job_id}*")):
             remove(path, use_shred, removed)
-        # 2-4. images
-        remove(UPLOAD_DIR / f"{job_id}.png", use_shred, removed)
+        # 2-4. images — glob, because the service suffixes an upload with the slot
+        # it filled (<id>_image.png, <id>_mask.png, <id>_reference_2.png). Matching
+        # only <id>.png left every uploaded source and mask on disk.
+        for path in sorted(UPLOAD_DIR.glob(f"{job_id}*")):
+            remove(path, use_shred, removed)
         remove(THUMB_DIR / f"{job_id}.jpg", use_shred, removed)
-        remove(INPUT_DIR / f"{job_id}.png", use_shred, removed)
+        for path in sorted(INPUT_DIR.glob(f"{job_id}*")):
+            remove(path, use_shred, removed)
         for path in sorted(TEMP_DIR.rglob(f"{job_id}*")):
             remove(path, use_shred, removed)
 

@@ -247,3 +247,22 @@ input[type="file"] { padding: 7px; font-size: 12.5px; }
 .player-wrap { max-height: 70vh; overflow: auto; }
 .sub a { color: var(--accent); }
 .library-head select { padding: 5px 8px; font-size: 12px; }
+
+/* --------------------------------------------------------------- mask painter */
+.painter {
+  border: 1.5px dashed var(--line);
+  border-radius: var(--radius);
+  background: var(--panel-2);
+  min-height: 130px;
+  /* grid, not flex: a flex item sizes from the canvas's intrinsic width and
+     overflows the column instead of scaling down to it. */
+  /* block, not flex/grid: both size the track from the canvas's intrinsic width
+     and overflow the column. Block gives width:100% a real containing block. */
+  display: block;
+  overflow: hidden;
+}
+.painter-idle { padding: 40px 18px; text-align: center; margin: 0; }
+.painter-view { width: 100%; max-width: 100%; height: auto; display: block; cursor: crosshair; touch-action: none; }
+.painter-tools { display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+.painter-tools .brush { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.painter-tools input[type=range] { width: 110px; padding: 0; }

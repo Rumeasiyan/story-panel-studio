@@ -10,6 +10,9 @@ let PIPELINES = [];
 let JOBS = [];
 let openJobId = null;
 const fileInputs = new Map();   // param name -> <input type=file>
+const previewUrls = new Map();  // param name -> object URL currently painted
+let lastZoneKey = null;         // dropzone the user last clicked, for paste targeting
+let painter = null;             // mask painter state, see startPainter()
 
 // ------------------------------------------------------------------- helpers
 
@@ -87,11 +90,38 @@ function renderFields() {
 
   const parts = [];
   for (const key of pipeline.accepts_files || []) {
+    // The mask is painted over the source image rather than uploaded: a mask made
+    // elsewhere has to match the panel pixel for pixel, which is the whole friction.
+    if (key === 'mask') {
+      parts.push(`
+        <div class="field">
+          <span>mask <em class="hint">(paint over the image)</em></span>
+          <div class="painter" id="painter">
+            <p class="dz-empty painter-idle">Load an image above, then brush over the region to change.</p>
+          </div>
+          <div class="painter-tools" id="painterTools" hidden>
+            <label class="brush">brush
+              <input type="range" id="brushSize" min="8" max="220" value="70">
+            </label>
+            <button type="button" id="maskClear">clear</button>
+            <small class="hint" id="maskState">nothing painted</small>
+          </div>
+          <input type="file" id="f_mask" accept="image/*" hidden>
+        </div>`);
+      continue;
+    }
     const accept = key.includes('audio') ? 'audio/*' : 'image/*';
+    const verb = key.includes('audio') ? 'Click or drop an audio file' : 'Click, drop, or paste an image';
     parts.push(`
       <label class="field">
         <span>${key} <em class="hint">(file)</em></span>
-        <input type="file" id="f_${key}" accept="${accept}">
+        <div class="dropzone" id="dz_${key}" data-key="${key}">
+          <div class="dz-empty">
+            <p class="dz-icon">${key.includes('audio') ? '\u{1F3B5}' : '\u{1F5BC}'}</p>
+            <p>${verb}</p>
+          </div>
+        </div>
+        <input type="file" id="f_${key}" accept="${accept}" hidden>
       </label>`);
   }
   for (const param of pipeline.params) {
@@ -107,7 +137,239 @@ function renderFields() {
 
   for (const key of pipeline.accepts_files || []) {
     fileInputs.set(key, $(`f_${key}`));
+    if (key !== 'mask') wireDropzone(key);
   }
+  painter = null;
+  if ((pipeline.accepts_files || []).includes('mask')) wirePainter();
+}
+
+// ----------------------------------------------------------------- dropzones
+
+// A file input's .files is read-only, but it is assignable from a DataTransfer
+// list. That is what lets a dropped or pasted File reach collectForm() unchanged.
+function setFile(key, file, repaint = true) {
+  const input = fileInputs.get(key);
+  if (!input) return;
+  const transfer = new DataTransfer();
+  if (file) transfer.items.add(file);
+  input.files = transfer.files;
+  if (repaint) paintZone(key, file);
+  if (key === 'image' && painter !== null) loadPainterSource(file);
+}
+
+function paintZone(key, file) {
+  const zone = $(`dz_${key}`);
+  if (!zone) return;
+
+  const stale = previewUrls.get(key);
+  if (stale) { URL.revokeObjectURL(stale); previewUrls.delete(key); }
+
+  if (!file) {
+    const audio = key.includes('audio');
+    zone.innerHTML = `
+      <div class="dz-empty">
+        <p class="dz-icon">${audio ? '\u{1F3B5}' : '\u{1F5BC}'}</p>
+        <p>${audio ? 'Click or drop an audio file' : 'Click, drop, or paste an image'}</p>
+      </div>`;
+    return;
+  }
+
+  const label = `${escapeHtml(file.name || 'pasted')} \u00b7 ${Math.round(file.size / 1024)} KB`;
+  if (file.type.startsWith('image/')) {
+    const url = URL.createObjectURL(file);
+    previewUrls.set(key, url);
+    zone.innerHTML = `<img src="${url}" alt=""><button type="button" class="chip-clear" data-clear="${key}">\u2715 clear</button>`;
+  } else {
+    zone.innerHTML = `<div class="dz-empty"><p class="dz-icon">\u{1F3B5}</p><p>${label}</p></div>
+      <button type="button" class="chip-clear" data-clear="${key}">\u2715 clear</button>`;
+  }
+}
+
+function wireDropzone(key) {
+  const zone = $(`dz_${key}`);
+  const input = fileInputs.get(key);
+  if (!zone || !input) return;
+
+  input.addEventListener('change', () => {
+    const file = input.files?.[0] || null;
+    paintZone(key, file);
+    if (key === 'image' && painter !== null) loadPainterSource(file);
+  });
+
+  // The zone lives inside a <label> wrapping the input, so a bare click already
+  // opens the picker. Only the clear chip has to opt out of that.
+  zone.addEventListener('click', (event) => {
+    lastZoneKey = key;
+    const clear = event.target.closest('[data-clear]');
+    if (clear) {
+      event.preventDefault();
+      event.stopPropagation();
+      setFile(key, null);
+    }
+  });
+
+  for (const name of ['dragenter', 'dragover']) {
+    zone.addEventListener(name, (event) => {
+      event.preventDefault();
+      zone.classList.add('over');
+    });
+  }
+  for (const name of ['dragleave', 'dragend']) {
+    zone.addEventListener(name, () => zone.classList.remove('over'));
+  }
+  zone.addEventListener('drop', (event) => {
+    event.preventDefault();
+    zone.classList.remove('over');
+    const file = event.dataTransfer?.files?.[0];
+    if (file) { lastZoneKey = key; setFile(key, file); }
+  });
+}
+
+// -------------------------------------------------------------- mask painter
+
+// Two canvases at the source image's natural size. `mask` is the black/white PNG the
+// pipeline consumes — white repaints, black comes back bit-identical. `overlay` is the
+// red wash the user actually sees. Both take the same strokes; only mask is uploaded.
+function wirePainter() {
+  painter = { mask: null, overlay: null, view: null, image: null, drawing: false, dirty: false };
+  $('brushSize')?.addEventListener('input', () => { /* radius read live on stroke */ });
+  $('maskClear')?.addEventListener('click', () => {
+    if (!painter?.mask) return;
+    painter.mask.getContext('2d').fillStyle = '#000';
+    painter.mask.getContext('2d').fillRect(0, 0, painter.mask.width, painter.mask.height);
+    painter.overlay.getContext('2d').clearRect(0, 0, painter.overlay.width, painter.overlay.height);
+    painter.dirty = false;
+    redrawPainter();
+    setFile('mask', null, false);
+    $('maskState').textContent = 'nothing painted';
+  });
+  const current = fileInputs.get('image')?.files?.[0];
+  if (current) loadPainterSource(current);
+}
+
+function loadPainterSource(file) {
+  const host = $('painter');
+  if (!host || !painter) return;
+  setFile('mask', null, false);
+  if (!file) {
+    painter.image = null;
+    host.innerHTML = '<p class="dz-empty painter-idle">Load an image above, then brush over the region to change.</p>';
+    $('painterTools').hidden = true;
+    return;
+  }
+
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  img.onload = () => {
+    painter.image = img;
+    painter.mask = document.createElement('canvas');
+    painter.overlay = document.createElement('canvas');
+    for (const canvas of [painter.mask, painter.overlay]) {
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+    }
+    const maskCtx = painter.mask.getContext('2d');
+    maskCtx.fillStyle = '#000';
+    maskCtx.fillRect(0, 0, painter.mask.width, painter.mask.height);
+
+    host.innerHTML = '';
+    const view = document.createElement('canvas');
+    view.className = 'painter-view';
+    view.width = img.naturalWidth;
+    view.height = img.naturalHeight;
+    host.appendChild(view);
+    painter.view = view;
+    painter.dirty = false;
+    redrawPainter();
+    wireStrokes(view);
+    $('painterTools').hidden = false;
+    $('maskState').textContent = 'nothing painted';
+    URL.revokeObjectURL(url);
+  };
+  img.onerror = () => URL.revokeObjectURL(url);
+  img.src = url;
+}
+
+function redrawPainter() {
+  const ctx = painter.view.getContext('2d');
+  ctx.clearRect(0, 0, painter.view.width, painter.view.height);
+  ctx.drawImage(painter.image, 0, 0);
+  ctx.drawImage(painter.overlay, 0, 0);
+}
+
+function wireStrokes(view) {
+  // The canvas is displayed scaled to the column width, so every pointer position has
+  // to be mapped back to natural pixels or the mask lands offset from what was brushed.
+  const toNatural = (event) => {
+    const box = view.getBoundingClientRect();
+    return {
+      x: (event.clientX - box.left) * (view.width / box.width),
+      y: (event.clientY - box.top) * (view.height / box.height),
+    };
+  };
+
+  const dab = (point) => {
+    const radius = Number($('brushSize').value) / 2;
+    for (const [canvas, style] of [[painter.mask, '#fff'], [painter.overlay, 'rgba(255,64,64,.45)']]) {
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = style;
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    painter.dirty = true;
+  };
+
+  view.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    try { view.setPointerCapture(event.pointerId); } catch { /* capture is a nicety */ }
+    painter.drawing = true;
+    dab(toNatural(event));
+    redrawPainter();
+  });
+  view.addEventListener('pointermove', (event) => {
+    if (!painter.drawing) return;
+    dab(toNatural(event));
+    redrawPainter();
+  });
+  for (const name of ['pointerup', 'pointercancel']) {
+    view.addEventListener(name, () => {
+      if (!painter.drawing) return;
+      painter.drawing = false;
+      exportMask();
+    });
+  }
+}
+
+function exportMask() {
+  if (!painter?.mask || !painter.dirty) return;
+  painter.mask.toBlob((blob) => {
+    if (!blob) return;
+    setFile('mask', new File([blob], 'mask.png', { type: 'image/png' }), false);
+    $('maskState').textContent = `mask ready · ${painter.mask.width}×${painter.mask.height} · ${Math.round(blob.size / 1024)} KB`;
+  }, 'image/png');
+}
+
+// Where a paste lands when a pipeline exposes several file slots. The zone you
+// last clicked wins; otherwise the first slot still empty; otherwise the first.
+function pasteTarget() {
+  const keys = [...fileInputs.keys()].filter((k) => !k.includes('audio'));
+  if (!keys.length) return null;
+  if (lastZoneKey && keys.includes(lastZoneKey)) return lastZoneKey;
+  return keys.find((k) => !fileInputs.get(k)?.files?.[0]) || keys[0];
+}
+
+function handlePaste(event) {
+  const items = [...(event.clipboardData?.items || [])];
+  const image = items.find((item) => item.type.startsWith('image/'));
+  if (!image) return;                       // let text pastes reach the prompt box
+  const file = image.getAsFile();
+  if (!file) return;
+  const key = pasteTarget();
+  if (!key) return;
+  event.preventDefault();
+  setFile(key, file);
+  $(`dz_${key}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 
 function collectForm() {
@@ -366,6 +628,7 @@ function wireModal() {
   $('generate').addEventListener('click', generate);
   $('kindFilter').addEventListener('change', refreshJobs);
   $('pipeline').addEventListener('change', renderFields);
+  document.addEventListener('paste', handlePaste);
 
   const payload = await api('/api/pipelines');
   PIPELINES = payload.pipelines;
