@@ -1,6 +1,6 @@
 # Environment snapshot
 
-- Generated: 2026-08-26T02:13:31+05:30
+- Generated: 2026-10-25T12:59:05+05:30
 - Project root: `/home/sshroot/external/story-panel-studio`
 
 ## System
@@ -9,7 +9,7 @@
 |---|---|
 | Fedora | Fedora release 43 (Forty Three) |
 | Kernel | 7.1.8-100.fc43.x86_64 |
-| Session | wayland / Hyprland |
+| Session | tty / unknown |
 | GPU | NVIDIA GeForce RTX 3050 |
 | NVIDIA driver | 580.178.04 |
 | VRAM | 8192 MiB |
@@ -22,44 +22,48 @@
 |---|---|
 | Git | 2.55.0 |
 | Python (.venv) | 3.13.14 |
-| pip | 26.2.1 |
+| pip | 26.2.2 |
 | PyTorch | 2.13.0+cu130 |
 | PyTorch CUDA runtime | 13.0 |
 | torch.cuda.is_available() | True |
 | FFmpeg | 7.1.5 |
-| ComfyUI commit | `7a054eb472d4f911ad3ed1d943f6e7de4d67730f` |
-| ComfyUI subject | comfy-aimdo 0.4.15 (#15886) |
+| ComfyUI commit | `d8e7bbc9d586d95f758d6b0ed23d519088be578a` |
+| ComfyUI subject | fix(video): remux HEVC to mp4/mov as hvc1 via hevc_mp4toannexb (#15809) |
 
 ## Custom nodes
 
-_none installed_
 
 ## Model profiles
 
 ```
-active profile : wan22-ti2v-5b
+active profile : cinematic-sdxl
 project root   : /home/sshroot/external/story-panel-studio
-free space     : 124.16 GB
+free space     : 62.40 GB
 
-  anime-sdxl       installed
+  anime-sdxl       not installed
+      missing                  models/checkpoints/animagine-xl-4.0-opt.safetensors (6.94 GB)
   cinematic-sdxl   installed
   wan22-ti2v-5b    not installed
       missing                  models/diffusion_models/wan2.2_ti2v_5B_fp16.safetensors (10.00 GB)
       missing                  models/vae/wan2.2_vae.safetensors (1.41 GB)
       missing                  models/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors (6.74 GB)
+  qwen-image-edit-2511 installed
   flux2-klein-4b   installed
   wan21-fun-inp-1.3b not installed
       missing                  models/diffusion_models/wan2.1_fun_inp_1.3B_bf16.safetensors (3.13 GB)
       missing                  models/vae/wan_2.1_vae.safetensors (253.82 MB)
       missing                  models/clip_vision/clip_vision_h.safetensors (1.26 GB)
       missing                  models/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors (6.74 GB)
-  sdxl-lightning   installed
-  noobai-xl        installed
+  sdxl-lightning   incomplete
+      missing                  models/loras/sdxl_lightning_2step_lora.safetensors (393.85 MB)
+  noobai-xl        not installed
+      missing                  models/checkpoints/NoobAI-XL-v1.1.safetensors (7.11 GB)
   illustrious-xl   installed
-  z-image-turbo    installed
+  z-image-turbo    incomplete
+      missing                  models/diffusion_models/z_image_turbo_int8_convrot.safetensors (6.20 GB)
 
-models/ on disk : 52.93 GB
-missing/invalid : 29.53 GB would need downloading
+models/ on disk : 51.06 GB
+missing/invalid : 50.17 GB would need downloading
 
 recorded installs:
   anime-sdxl:animagine-xl-4-opt: rev 2b7c1b397761 at 2026-08-01T05:39:34+05:30
@@ -83,25 +87,25 @@ recorded installs:
 ## Disk usage
 
 ```
-  models                   52.93 GB
-    checkpoints            27.92 GB
-    diffusion_models       10.27 GB
-    text_encoders           8.04 GB
-    vae                   503.43 MB
-    loras                 873.13 MB
-  input                           ?
-  output                  168.57 MB
+  models                   51.06 GB
+    checkpoints            13.88 GB
+    diffusion_models       17.32 GB
+    text_encoders          14.16 GB
+    vae                   757.23 MB
+    loras                 479.28 MB
+  input                    41.55 MB
+  output                    1.56 GB
   temp                            ?
   cache                     1.44 MB
-  logs                      3.88 MB
-  user                     17.62 MB
-  .venv                     6.44 GB
-  engine/ComfyUI           58.68 MB
+  logs                      1.26 MB
+  user                     19.73 MB
+  .venv                     6.69 GB
+  engine/ComfyUI           58.81 MB
 
-  project total            68.12 GB
-  free on volume          124.16 GB
-Filesystem                                             Size  Used Avail Use% Mounted on
-/dev/mapper/luks-7a83c357-2176-4a75-b6c7-d56d23ad2e94  236G  113G  116G  50% /home
+  project total            74.19 GB
+  free on volume           62.38 GB
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/dm-0       475G  412G   59G  88% /home
 ```
 
 ## pip freeze
@@ -127,24 +131,29 @@ comfy-angle==0.1.1
 comfy-kitchen==0.2.31
 comfyui-embedded-docs==0.5.10
 comfyui-manager==4.2.2
-comfyui-workflow-templates-core==0.3.320
-comfyui-workflow-templates-json==0.1.55
+comfyui-workflow-templates-core==0.3.322
+comfyui-workflow-templates-json==0.1.57
 comfyui-workflow-templates-media-api==0.3.84
-comfyui-workflow-templates-media-assets-01==0.1.33
+comfyui-workflow-templates-media-assets-01==0.1.35
 comfyui-workflow-templates-media-image==0.3.160
 comfyui-workflow-templates-media-other==0.3.229
 comfyui-workflow-templates-media-video==0.3.101
-comfyui_frontend_package==1.49.6
-comfyui_workflow_templates==0.11.46
+comfyui_frontend_package==1.51.9
+comfyui_workflow_templates==0.11.48
 cryptography==50.0.1
+ctranslate2==4.8.1
 cuda-bindings==13.3.1
 cuda-pathfinder==1.6.0
 cuda-toolkit==13.0.3.0
 einops==0.8.2
 fastapi==0.141.1
+faster-whisper==1.2.1
 filelock==3.32.3
+flatbuffers==25.12.19
+fonttools==4.63.0
 frozenlist==1.8.0
 fsspec==2026.7.0
+gguf==0.19.0
 gitdb==4.0.12
 GitPython==3.1.60
 greenlet==3.5.5
@@ -181,9 +190,11 @@ nvidia-nccl-cu13==2.29.7
 nvidia-nvjitlink==13.3.33
 nvidia-nvshmem-cu13==3.4.5
 nvidia-nvtx==13.0.85
+onnxruntime==1.29.0
 packaging==26.3
 pillow==12.3.0
 propcache==0.5.2
+protobuf==7.36.0
 psutil==7.2.2
 pycparser==3.0
 pydantic==2.13.4
@@ -203,10 +214,11 @@ rich==15.0.0
 safetensors==0.8.0
 scipy==1.18.1
 sentencepiece==0.2.2
-setuptools==84.0.0
+setuptools==84.2.1
 shellingham==1.5.4
 simpleeval==1.0.7
 smmap==5.0.3
+soundfile==0.14.0
 spandrel==0.4.2
 SQLAlchemy==2.0.52
 starlette==1.6.0

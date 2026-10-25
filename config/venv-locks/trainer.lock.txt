@@ -19,7 +19,7 @@ imagesize==1.4.1
 importlib_metadata==9.0.0
 Jinja2==3.1.6
 # Editable install with no version control (library==0.0.0)
--e /home/sshroot/external/ai-video-gen/tools/sd-scripts
+-e ./tools/sd-scripts
 lion-pytorch==0.2.3
 Markdown==3.10.3
 markdown-it-py==4.2.0

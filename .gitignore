@@ -84,3 +84,7 @@ characters/*/images/
 
 # Generated font instances — regenerate with assets/fonts/README.md
 assets/fonts/*.ttf
+
+# Generated per-machine by bootstrap.sh (absolute base_path). Template is
+# config/extra_model_paths.yaml.example.
+config/extra_model_paths.yaml

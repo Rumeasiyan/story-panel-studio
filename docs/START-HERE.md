@@ -3,7 +3,7 @@
 Single entry point for the agent working `goal-ai-story-video-network`. Read this first;
 everything else is linked from here.
 
-**Repo:** `/home/sshroot/external/story-panel-studio` · **version 2.2.0**
+**Repo:** `~/external/story-panel-studio` · **version 2.2.0**
 **API:** `http://127.0.0.1:8189` (also on LAN and Tailscale)
 **Engine:** ComfyUI on `127.0.0.1:8188` — never call it directly, see §7
 **Hardware:** one RTX 3050, 8 GB VRAM. **One job at a time.**
@@ -34,7 +34,7 @@ the orchestrator.
 curl -s localhost:8189/api/status | python3 -m json.tool
 
 # if not:
-cd /home/sshroot/external/story-panel-studio && ./scripts/serve.sh    # Ctrl-C stops both
+cd ~/external/story-panel-studio && ./scripts/serve.sh    # Ctrl-C stops both
 
 # what can it do? (read this rather than hardcoding — it is the live contract)
 curl -s localhost:8189/api/pipelines

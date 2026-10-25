@@ -11,7 +11,7 @@
 # with ./bootstrap.sh --repair if the project is moved to a different absolute path.
 
 ai_video_gen:
-  base_path: /home/sshroot/external/story-panel-studio
+  base_path: /absolute/path/to/story-panel-studio
   is_default: true
 
   checkpoints: models/checkpoints/

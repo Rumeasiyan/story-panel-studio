@@ -3,6 +3,34 @@
 Notable changes per version. The version lives in `VERSION`; see AGENTS.md for when
 each part changes.
 
+## 3.2.2 — 2026-10-25
+
+### Security
+- `config/runtime.env` shipped `UI_HOST=0.0.0.0`, contradicting the repository's own
+  first constraint. A fresh clone running `serve.sh` exposed an unauthenticated
+  generation service on every interface — café wifi and any LAN included — where
+  anyone reaching the port can generate, browse, download and delete every
+  generation. The committed default is now `127.0.0.1`; widening it is a local
+  decision made in a gitignored `.env`. Found while auditing the repository for
+  public release.
+
+### Changed
+- `config/extra_model_paths.yaml` is no longer tracked. It carries an absolute
+  `base_path` that is correct on exactly one machine, and `bootstrap.sh` already
+  writes and self-heals it. The template is `config/extra_model_paths.yaml.example`.
+- Absolute `/home/<user>/` paths in `docs/START-HERE.md`, `reports/ENVIRONMENT.md`
+  and `reports/INSTALLATION_REPORT.md` are now `~`-relative, so the documented
+  commands work on any clone.
+- Git history rewritten to drop assistant co-author and session trailers from 21
+  commits. Commit contents, authorship and dates are unchanged; only trailer lines
+  were removed.
+
+### Fixed
+- `config/venv-locks/trainer.lock.txt` pinned the editable sd-scripts install to
+  `ai-video-gen`, a different project left over from the rename. Replaced with
+  `./tools/sd-scripts`, so rebuilding `.venv-trainer` from the lock resolves inside
+  this repository.
+
 ## 3.2.1 — 2026-08-27
 
 ### Fixed

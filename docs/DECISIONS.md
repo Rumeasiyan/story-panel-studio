@@ -294,3 +294,33 @@ English path. Unresolved.
 **Licence note.** The k2-fsa/OmniVoice *model* is Apache-2.0 and fine commercially. The
 `omnivoice-studio` GUI wrapper is FSL-1.1-ALv2 and forbids commercial use for two years —
 different project, do not install it.
+
+## The committed `UI_HOST` default is loopback, not this workstation's address
+
+**Decision.** `config/runtime.env` sets `UI_HOST=127.0.0.1`. The Tailscale address this
+machine actually serves on lives in the gitignored `.env`, never in the committed file.
+
+**Why.** The committed value had been `0.0.0.0`, which contradicted the constraint table
+in AGENTS.md that the same repository states first. The comment above it described the
+risk accurately and then took it anyway. On this workstation it was harmless — the local
+`.env` has always pinned the tailnet address, so the service never actually bound to all
+interfaces — but the committed default is what a stranger gets, and there is no
+authentication in front of the API. Cloning and running `serve.sh` would have published
+an unauthenticated generation service on every interface the machine has.
+
+**Consequence.** Remote access is now opt-in per machine. Anyone who wants it copies
+`.env.example` and sets the one value, which is also where the warning belongs, because
+that is the moment the decision is made.
+
+## `config/extra_model_paths.yaml` is generated, not tracked
+
+**Decision.** The file is gitignored; `config/extra_model_paths.yaml.example` is the
+tracked template.
+
+**Why.** Its `base_path` is an absolute path, so the committed copy was correct on
+precisely one machine and leaked that machine's username besides. `bootstrap.sh` already
+writes the file when absent and rewrites `base_path` when it does not match the project
+root, so tracking it bought nothing and guaranteed a wrong value for every other clone.
+
+**Consequence.** A fresh clone must run `./bootstrap.sh` before ComfyUI can find weights,
+which it already had to do.
